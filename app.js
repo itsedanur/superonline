@@ -756,7 +756,7 @@ function populateReviewQueueTable(data) {
             <td>${conflictBadge}</td>
             <td><span class="info-badge" style="font-size: 0.72rem;">${item.reviewStatus || 'PENDING'}</span></td>
             <td><span style="font-size: 0.75rem; color: var(--text-muted);">${item.date || ""}</span></td>
-            <td><button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.75rem;" onclick="openReviewDetailModal('${item.id}')">🔍 İncele</button></td>
+            <td><button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.75rem;" data-action="review-complaint" data-complaint-id="${item.id}">🔍 İncele</button></td>
         `;
         tbody.appendChild(tr);
     });
@@ -1212,23 +1212,26 @@ async function loadExecutiveDashboardData() {
         const insightsContainer = document.getElementById("executive-ai-insights-container");
         if (insightsContainer && Array.isArray(summary.ai_insights)) {
             insightsContainer.innerHTML = summary.ai_insights.map(item => {
-                let borderCol = "#38BDF8";
-                let bgCol = "rgba(56, 189, 248, 0.08)";
+                let borderCol = "#005BAC";
+                let bgCol = "#F0F9FF";
                 if (item.type === "CRITICAL_ALERT") {
-                    borderCol = "#F87171";
-                    bgCol = "rgba(248, 113, 113, 0.1)";
+                    borderCol = "#EF4444";
+                    bgCol = "#FEF2F2";
                 } else if (item.type === "PRODUCT_HIGHLIGHT") {
-                    borderCol = "#FFC72C";
-                    bgCol = "rgba(255, 199, 44, 0.1)";
+                    borderCol = "#005BAC";
+                    bgCol = "#F0F9FF";
                 } else if (item.type === "ACTION_RECOMMENDATION") {
-                    borderCol = "#A855F7";
-                    bgCol = "rgba(168, 85, 247, 0.1)";
+                    borderCol = "#FFC72C";
+                    bgCol = "#FFFBEB";
+                } else if (item.type === "STABLE") {
+                    borderCol = "#22C55E";
+                    bgCol = "#F0FDF4";
                 }
 
                 return `
-                    <div style="padding: 14px; background: ${bgCol}; border-left: 4px solid ${borderCol}; border-radius: 8px;">
-                        <div style="font-weight: 700; font-size: 0.95rem; color: #F8FAFC; margin-bottom: 6px;">${item.icon || ''} ${item.title}</div>
-                        <div style="font-size: 0.85rem; color: #CBD5E1; line-height: 1.4;">${item.body || item.message || ''}</div>
+                    <div style="padding: 12px 14px; background: ${bgCol}; border-left: 4px solid ${borderCol}; border-radius: 6px; border-top: 1px solid #E2E8F0; border-right: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0;">
+                        <div style="font-weight: 700; font-size: 0.88rem; color: #1F2937; margin-bottom: 4px;">${item.icon || ''} ${item.title}</div>
+                        <div style="font-size: 0.82rem; color: #4B5563; line-height: 1.4;">${item.body || item.message || ''}</div>
                     </div>
                 `;
             }).join("");
@@ -1243,28 +1246,25 @@ async function loadExecutiveDashboardData() {
             const superboxData = trendData.map(d => d.superbox_cnt ?? d.Superbox ?? 0);
             const adslData = trendData.map(d => d.adsl_cnt ?? d.ADSL ?? 0);
 
-            console.log("EXEC_PRODUCT_TREND_LABELS:", labels);
-            console.log("EXEC_PRODUCT_TREND_DATA:", { fiberData, superboxData, adslData });
-
             execTrendChartInstance = new Chart(ctxTrend.getContext("2d"), {
                 type: "line",
                 data: {
                     labels,
                     datasets: [
-                        { label: "⚡ Fiber", data: fiberData, borderColor: "#00A3E0", backgroundColor: "rgba(0,163,224,0.15)", fill: true, tension: 0.3 },
-                        { label: "📦 Superbox", data: superboxData, borderColor: "#FFC72C", backgroundColor: "rgba(255,199,44,0.15)", fill: true, tension: 0.3 },
-                        { label: "🔌 ADSL", data: adslData, borderColor: "#A855F7", backgroundColor: "rgba(168,85,247,0.15)", fill: true, tension: 0.3 }
+                        { label: "⚡ Fiber", data: fiberData, borderColor: "#005BAC", backgroundColor: "rgba(0,91,172,0.08)", fill: true, tension: 0.3 },
+                        { label: "📦 Superbox", data: superboxData, borderColor: "#D97706", backgroundColor: "rgba(217,119,6,0.08)", fill: true, tension: 0.3 },
+                        { label: "🔌 ADSL", data: adslData, borderColor: "#7C3AED", backgroundColor: "rgba(124,58,237,0.08)", fill: true, tension: 0.3 }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: "top", labels: { color: "#94A3B8" } }
+                        legend: { position: "top", labels: { color: "#4B5563", font: { family: "Inter" } } }
                     },
                     scales: {
-                        x: { ticks: { color: "#64748B" }, grid: { color: "rgba(255,255,255,0.05)" } },
-                        y: { ticks: { color: "#64748B" }, grid: { color: "rgba(255,255,255,0.05)" } }
+                        x: { ticks: { color: "#6B7280" }, grid: { color: "#E5E7EB" } },
+                        y: { ticks: { color: "#6B7280" }, grid: { color: "#E5E7EB" } }
                     }
                 }
             });
@@ -1275,20 +1275,18 @@ async function loadExecutiveDashboardData() {
         const ctxRising = document.getElementById("execRisingCategoryChart");
         if (ctxRising && Array.isArray(summary.fastest_rising_categories)) {
             const catLabels = summary.fastest_rising_categories.map(c => c.sub_category || c.category || "Genel");
-            const catValues = summary.fastest_rising_categories.map(c => c.growth_pct ?? c.growth ?? 0);
-
-            console.log("EXEC_RISING_LABELS:", catLabels);
-            console.log("EXEC_RISING_VALUES:", catValues);
+            // Grafiği adet bazlı göster: barValue = absolute_change (eğer yoksa recent_count)
+            const catValues = summary.fastest_rising_categories.map(c => c.absolute_change ?? c.recent_count ?? 0);
 
             execRisingChartInstance = new Chart(ctxRising.getContext("2d"), {
                 type: "bar",
                 data: {
                     labels: catLabels,
                     datasets: [{
-                        label: "Büyüme Oranı (%)",
+                        label: "Şikâyet Adedi Değişimi",
                         data: catValues,
-                        backgroundColor: ["#F87171", "#FB923C", "#FACC15", "#38BDF8", "#A855F7"],
-                        borderRadius: 6
+                        backgroundColor: ["#EF4444", "#F59E0B", "#EAB308", "#0284C7", "#7C3AED"],
+                        borderRadius: 4
                     }]
                 },
                 options: {
@@ -1296,11 +1294,24 @@ async function loadExecutiveDashboardData() {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false }
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const raw = summary.fastest_rising_categories[context.dataIndex];
+                                    return [
+                                        `Son 7 gün: ${raw.recent_count || 0}`,
+                                        `Önceki 7 gün: ${raw.previous_count || 0}`,
+                                        `Değişim: +${raw.absolute_change || 0}`,
+                                        `Durum: ${raw.change_status === 'NEW_ACTIVITY' ? 'Yeni Aktivite' : 'Artış'}`
+                                    ];
+                                }
+                            }
+                        }
                     },
                     scales: {
-                        x: { ticks: { color: "#64748B" }, grid: { color: "rgba(255,255,255,0.05)" } },
-                        y: { ticks: { color: "#94A3B8" }, grid: { display: false } }
+                        x: { ticks: { color: "#6B7280" }, grid: { color: "#E5E7EB" } },
+                        y: { ticks: { color: "#4B5563" }, grid: { display: false } }
                     }
                 }
             });
@@ -1319,19 +1330,19 @@ async function loadExecutiveDashboardData() {
                 data: {
                     labels,
                     datasets: [
-                        { label: "Toplam Şikâyet Hacmi", data: totalVolume, backgroundColor: "#38BDF8", borderRadius: 4 },
-                        { label: "Negatif Duygulu Şikâyetler", data: negVolume, backgroundColor: "#F87171", borderRadius: 4 }
+                        { label: "Toplam Şikâyet Hacmi", data: totalVolume, backgroundColor: "#0284C7", borderRadius: 4 },
+                        { label: "Negatif Duygulu Şikâyetler", data: negVolume, backgroundColor: "#EF4444", borderRadius: 4 }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: "top", labels: { color: "#94A3B8" } }
+                        legend: { position: "top", labels: { color: "#4B5563", font: { family: "Inter" } } }
                     },
                     scales: {
-                        x: { ticks: { color: "#64748B" }, grid: { color: "rgba(255,255,255,0.05)" } },
-                        y: { ticks: { color: "#64748B" }, grid: { color: "rgba(255,255,255,0.05)" } }
+                        x: { ticks: { color: "#6B7280" }, grid: { color: "#E5E7EB" } },
+                        y: { ticks: { color: "#6B7280" }, grid: { color: "#E5E7EB" } }
                     }
                 }
             });
@@ -1341,9 +1352,9 @@ async function loadExecutiveDashboardData() {
         if (execDistChartInstance) execDistChartInstance.destroy();
         const ctxDist = document.getElementById("execProductDistChart");
         if (ctxDist && summary.product_metrics) {
-            const pm = summary.product_metrics;
-            const distLabels = Object.keys(pm).map(k => `${k} (${pm[k].total || 0})`);
-            const distValues = Object.values(pm).map(v => v.total || 0);
+            const p = summary.product_metrics;
+            const distLabels = ["Fiber", "Superbox", "ADSL"];
+            const distValues = [p["Fiber"]?.total || 0, p["Superbox"]?.total || 0, p["ADSL"]?.total || 0];
 
             execDistChartInstance = new Chart(ctxDist.getContext("2d"), {
                 type: "doughnut",
@@ -1351,17 +1362,18 @@ async function loadExecutiveDashboardData() {
                     labels: distLabels,
                     datasets: [{
                         data: distValues,
-                        backgroundColor: ["#00A3E0", "#FFC72C", "#A855F7"],
-                        borderWidth: 0,
-                        hoverOffset: 6
+                        backgroundColor: ["#005BAC", "#FFC72C", "#7C3AED"],
+                        borderWidth: 2,
+                        borderColor: "#FFFFFF"
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: "bottom", labels: { color: "#94A3B8" } }
-                    }
+                        legend: { position: "bottom", labels: { color: "#4B5563", font: { family: "Inter", size: 11 } } }
+                    },
+                    cutout: "65%"
                 }
             });
         }
@@ -1370,3 +1382,14 @@ async function loadExecutiveDashboardData() {
         console.error("Executive Dashboard Data Error:", e);
     }
 }
+
+// Global Event Delegation for Dynamic Elements
+document.addEventListener("click", async (event) => {
+    const reviewBtn = event.target.closest("[data-action='review-complaint']");
+    if (reviewBtn) {
+        const complaintId = reviewBtn.dataset.complaintId;
+        if (complaintId) {
+            await openReviewDetailModal(complaintId);
+        }
+    }
+});
