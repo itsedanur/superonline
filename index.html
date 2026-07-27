@@ -683,6 +683,7 @@
                     <div class="table-responsive">
                         <table class="data-table">
                             <thead>
+                                <tr>
                                     <th>ID</th>
                                     <th>Karar Kaynağı</th>
                                     <th>Kaynak / Nihai Ürün</th>
@@ -691,6 +692,7 @@
                                     <th>Aciliyet</th>
                                     <th>Güven</th>
                                     <th>Tarih & Saat</th>
+                                    <th>İşlem</th>
                                 </tr>
                             </thead>
                             <tbody id="complaints-tbody"></tbody>
@@ -787,6 +789,42 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- READ-ONLY COMPLAINT DETAIL MODAL -->
+    <div id="modal-complaint-detail" class="modal-backdrop hidden">
+        <div class="modal-box" style="max-width: 760px;">
+            <div class="modal-header">
+                <h3 id="cd-title">📄 Şikâyet Detayı</h3>
+                <button class="btn-close" onclick="closeComplaintDetailModal()">✕</button>
+            </div>
+            <div class="modal-body" style="font-size: 0.9rem;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div><strong>ID:</strong> <span id="cd-id"></span></div>
+                    <div><strong>Tarih:</strong> <span id="cd-date"></span></div>
+                    <div><strong>Kaynak:</strong> <span id="cd-source"></span></div>
+                    <div><strong>İnceleme Durumu:</strong> <span id="cd-status"></span></div>
+                    <div><strong>Kaynak Ürün:</strong> <span id="cd-source-prod"></span></div>
+                    <div><strong>AI Ürünü:</strong> <span id="cd-ai-prod"></span></div>
+                    <div style="grid-column: 1 / -1;"><strong>Nihai Ürün:</strong> <span id="cd-final-prod"></span></div>
+                    <div><strong>Ana Kategori:</strong> <span id="cd-main-cat"></span></div>
+                    <div><strong>Alt Kategori:</strong> <span id="cd-sub-cat"></span></div>
+                    <div><strong>Duygu:</strong> <span id="cd-sentiment"></span></div>
+                    <div><strong>Aciliyet:</strong> <span id="cd-urgency"></span></div>
+                    <div><strong>Güven Skoru:</strong> <span id="cd-confidence"></span></div>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <strong>Kaynak URL:</strong> <a id="cd-source-url" href="#" target="_blank" rel="noopener noreferrer" style="color: var(--turkcell-blue); word-break: break-all;"></a>
+                </div>
+                <div class="main-result-box">
+                    <span class="res-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Şikâyet Metni:</span>
+                    <p id="cd-text" style="font-size: 0.95rem; line-height: 1.5; color: var(--text-primary); margin-top: 6px;"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeComplaintDetailModal()">Kapat</button>
+            </div>
+        </div>
     </div>
 
     <!-- DETAIL & EDIT MODAL FOR REVIEW QUEUE -->

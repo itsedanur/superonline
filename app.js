@@ -600,15 +600,26 @@ function populateComplaintsTable(data) {
         const textContent = item.masked_content || item.maskedText || item.rawText || item.comment || "";
         const pubDate = item.sourcePublishedAt || item.date || item.created_at || "";
 
+        let sourceUrlBtn = "";
+        if (item.sourceUrl && (item.sourceUrl.startsWith("http://") || item.sourceUrl.startsWith("https://"))) {
+            sourceUrlBtn = `<button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.75rem;" onclick="window.open('${item.sourceUrl}', '_blank', 'noopener,noreferrer')">🔗 Kaynakta Aç</button>`;
+        } else {
+            sourceUrlBtn = `<button type="button" class="btn btn-outline disabled" style="padding: 4px 8px; font-size: 0.75rem; opacity: 0.5; cursor: not-allowed;" title="Kaynak bağlantısı bulunamadı" disabled>🔗 Kaynakta Aç</button>`;
+        }
+
         tr.innerHTML = `
-            <td><strong>${item.id}</strong></td>
+            <td><strong style="color: var(--turkcell-blue); cursor: pointer;" data-action="view-complaint" data-complaint-id="${item.id}">${item.id}</strong></td>
             <td><span class="badge-prod ${srcBadgeCls}" style="font-size:0.7rem;">${decisionSrc}</span></td>
             <td>${sourceHtml}<br>${finalHtml}</td>
-            <td style="max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${textContent.replace(/"/g, '&quot;')}">${textContent}</td>
+            <td style="max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;" title="${textContent.replace(/"/g, '&quot;')}" data-action="view-complaint" data-complaint-id="${item.id}">${textContent}</td>
             <td><div style="font-weight: 600; font-size: 0.85rem;">${item.mainCategory || item.topic || "Diğer"}</div><div style="font-size: 0.75rem; color: var(--text-muted);">${item.subCategory || ""}</div></td>
             <td><span class="badge-sent ${urgency === 'High' || urgency === 'Critical' ? 'negative' : 'positive'}">${urgency}</span></td>
             <td><span style="font-family: var(--font-mono); font-weight: 700; color: var(--turkcell-yellow);">${conf}</span></td>
             <td><span style="font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono);">${pubDate}</span></td>
+            <td style="display: flex; gap: 4px;">
+                <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.75rem;" data-action="view-complaint" data-complaint-id="${item.id}">🔍 İncele</button>
+                ${sourceUrlBtn}
+            </td>
         `;
         tbody.appendChild(tr);
     });
@@ -1385,6 +1396,12 @@ async function loadExecutiveDashboardData() {
 
 // Global Event Delegation for Dynamic Elements
 document.addEventListener("click", async (event) => {
+    // Modal background click to close
+    if (event.target.classList.contains("modal-backdrop")) {
+        closeReviewDetailModal();
+        closeComplaintDetailModal();
+    }
+
     const reviewBtn = event.target.closest("[data-action='review-complaint']");
     if (reviewBtn) {
         const complaintId = reviewBtn.dataset.complaintId;
@@ -1392,4 +1409,76 @@ document.addEventListener("click", async (event) => {
             await openReviewDetailModal(complaintId);
         }
     }
+
+    const viewBtn = event.target.closest("[data-action='view-complaint']");
+    if (viewBtn) {
+        const complaintId = viewBtn.dataset.complaintId;
+        if (complaintId) {
+            await openComplaintDetailModal(complaintId);
+        }
+    }
 });
+
+// Close Modals on ESC key
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+        closeReviewDetailModal();
+        closeComplaintDetailModal();
+    }
+});
+
+async function openComplaintDetailModal(id) {
+    try {
+        const res = await fetch(`${API_BASE}/api/v1/complaints/${id}`);
+        if (res.ok) {
+            const data = await res.json();
+            
+            document.getElementById("cd-id").innerText = data.id || "-";
+            document.getElementById("cd-date").innerText = data.sourcePublishedAt || data.reviewedAt || "-";
+            document.getElementById("cd-source").innerText = data.source || "-";
+            document.getElementById("cd-status").innerText = data.reviewStatus || "PENDING";
+            
+            document.getElementById("cd-source-prod").innerText = data.sourceProduct || "-";
+            document.getElementById("cd-ai-prod").innerText = (data.products && data.products.join(", ")) || data.primaryProduct || "-";
+            document.getElementById("cd-final-prod").innerText = data.finalProduct || data.primaryProduct || "-";
+            
+            document.getElementById("cd-main-cat").innerText = data.mainCategory || data.topic || "-";
+            document.getElementById("cd-sub-cat").innerText = data.subCategory || "-";
+            document.getElementById("cd-sentiment").innerText = data.sentiment || "-";
+            document.getElementById("cd-urgency").innerText = data.urgency || "-";
+            document.getElementById("cd-confidence").innerText = data.confidence || "-";
+            
+            const urlElem = document.getElementById("cd-source-url");
+            if (data.sourceUrl && (data.sourceUrl.startsWith("http://") || data.sourceUrl.startsWith("https://"))) {
+                urlElem.href = data.sourceUrl;
+                urlElem.innerText = data.sourceUrl;
+                urlElem.style.pointerEvents = "auto";
+                urlElem.style.textDecoration = "underline";
+                urlElem.style.color = "var(--turkcell-blue)";
+            } else {
+                urlElem.href = "#";
+                urlElem.innerText = "Kaynak bağlantısı bulunamadı.";
+                urlElem.style.pointerEvents = "none";
+                urlElem.style.textDecoration = "none";
+                urlElem.style.color = "var(--text-muted)";
+            }
+            
+            document.getElementById("cd-text").innerText = data.maskedText || data.masked_content || data.rawText || "-";
+
+            const modal = document.getElementById("modal-complaint-detail");
+            modal.classList.remove("hidden");
+        } else {
+            alert(`Şikâyet detayı yüklenemedi. HTTP ${res.status}`);
+        }
+    } catch (e) {
+        console.error("openComplaintDetailModal error:", e);
+        alert("Şikâyet detayı getirilirken bir hata oluştu.");
+    }
+}
+
+function closeComplaintDetailModal() {
+    const modal = document.getElementById("modal-complaint-detail");
+    if (modal) {
+        modal.classList.add("hidden");
+    }
+}
