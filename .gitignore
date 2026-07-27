@@ -43,4 +43,19 @@ playwright-report/
 test-results/
 screenshots/
 tmp/
-*.png
+# UI / Playwright test outputs
+playwright-report/
+test-results/
+screenshots/
+artifacts/
+*.trace.zip
+
+# Known temporary screenshots
+modal_opened.png
+reviewed_complaints_table.png
+table_filtered.png
+screenshot_desktop.png
+screenshot_mobile.png
+screenshot_tablet.png
+screenshot_ui2_modal.png
+screenshot_ui4_*.png

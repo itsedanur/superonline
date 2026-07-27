@@ -1709,22 +1709,23 @@ async function loadSocialProvidersStatus() {
                 iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
             }
             
-            let buttonsHtml = `
-                <button class="btn btn-ghost" disabled>Bağlantıyı Test Et</button>
-                <button class="btn btn-outline" disabled>Ön İzleme</button>
-                <button class="btn btn-primary" disabled>İçe Aktar</button>
-            `;
+            let buttonsHtml = '';
             
             if (p.platform === "X" && isEnabled && p.prototype) {
                 buttonsHtml = `
                     <button class="btn btn-ghost" onclick="previewXPrototype(this)">Bağlantıyı Test Et</button>
                     <button class="btn btn-outline" onclick="previewXPrototype(this)">Ön İzleme</button>
-                    <button id="btn-import-x" class="btn btn-primary" onclick="importXPrototype()" disabled>İçe Aktar</button>
+                    <button id="btn-import-x" class="btn btn-primary" onclick="importXPrototype()" disabled aria-disabled="true" tabindex="-1">İçe Aktar</button>
+                `;
+            } else {
+                buttonsHtml = `
+                    <button class="btn btn-outline" disabled aria-disabled="true" tabindex="-1" style="cursor: not-allowed; opacity: 0.5;">Bağlantı henüz yapılandırılmadı</button>
                 `;
             }
 
             const methodStr = p.prototype ? 'Free Web Discovery' : 'Resmi API';
             const statusStr = isEnabled ? (p.prototype ? 'Beklemede' : 'Aktif') : 'Devre Dışı';
+            const connStatus = isEnabled ? 'API Hazır' : 'Henüz yapılandırılmadı';
             
             grid.innerHTML += `
                 <div class="social-card">
@@ -1746,8 +1747,8 @@ async function loadSocialProvidersStatus() {
                             <div class="social-metric-value" style="text-align: left;">${statusStr}</div>
                         </div>
                         <div>
-                            <div class="social-metric-label" style="font-size:12px; margin-bottom: 2px;">Son Senkronizasyon</div>
-                            <div class="social-metric-value" style="text-align: left;">-</div>
+                            <div class="social-metric-label" style="font-size:12px; margin-bottom: 2px;">Bağlantı</div>
+                            <div class="social-metric-value" style="text-align: left;">${connStatus}</div>
                         </div>
                         <div>
                             <div class="social-metric-label" style="font-size:12px; margin-bottom: 2px;">Toplanan İçerik</div>
@@ -1755,7 +1756,7 @@ async function loadSocialProvidersStatus() {
                         </div>
                     </div>
                     
-                    <div class="social-card-actions">
+                    <div class="social-card-actions" style="margin-top: auto;">
                         ${buttonsHtml}
                     </div>
                 </div>
@@ -1819,17 +1820,41 @@ async function previewXPrototype(btnElement) {
             statusIcon = '<span class="status-dot status-dot-error" aria-label="Hata"></span>';
         }
         
-        const htmlContent = `
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                <div class="social-metric"><span class="social-metric-label">Durum</span><span class="social-metric-value">${statusIcon} ${data.access_status === "NO_RESULTS" ? "Sonuç bulunamadı" : data.access_status}</span></div>
-                <div class="social-metric"><span class="social-metric-label">Aranan sorgu</span><span class="social-metric-value">${data.scanned_queries}</span></div>
-                <div class="social-metric"><span class="social-metric-label">Bulunan içerik</span><span class="social-metric-value">${data.total_found + (data.unreadable_count || 0)}</span></div>
-                <div class="social-metric"><span class="social-metric-label">Duplicate</span><span class="social-metric-value">${data.duplicate_count}</span></div>
-                <div class="social-metric"><span class="social-metric-label">Yeni kayıt</span><span class="social-metric-value">${data.new_count}</span></div>
-                ${data.message ? `<div style="margin-top: 12px; padding: 12px; background: #F3F4F6; border-radius: 8px; font-size: 13px;"><strong>Sebep:</strong> ${data.message}</div>` : ''}
-            </div>
-        `;
-        showEnterpriseModal("X Veri Toplama Sonucu", htmlContent, false, btnElement);
+        let htmlContent = '';
+        if (data.access_status === "NO_RESULTS") {
+            htmlContent = `
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="font-weight: 500; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+                        ${statusIcon} Sonuç bulunamadı
+                    </div>
+                    <div style="color: #4B5563; font-size: 14px; line-height: 1.5;">
+                        Arama motorlarında indekslenmiş, erişilebilir X içeriği bulunamadı. Herhangi bir kayıt veritabanına eklenmedi.
+                    </div>
+                    
+                    <div style="border-top: 1px solid #E5E7EB; padding-top: 16px; margin-top: 8px;">
+                        <div class="social-metric"><span class="social-metric-label">Taranan sorgu</span><span class="social-metric-value">${data.scanned_queries}</span></div>
+                        <div class="social-metric"><span class="social-metric-label">Bulunan X bağlantısı</span><span class="social-metric-value">0</span></div>
+                        <div class="social-metric"><span class="social-metric-label">Okunabilen içerik</span><span class="social-metric-value">0</span></div>
+                        <div class="social-metric"><span class="social-metric-label">Okunamayan içerik</span><span class="social-metric-value">0</span></div>
+                        <div class="social-metric"><span class="social-metric-label">Duplicate</span><span class="social-metric-value">0</span></div>
+                        <div class="social-metric"><span class="social-metric-label">Aktarılabilir yeni kayıt</span><span class="social-metric-value">0</span></div>
+                    </div>
+                    <div style="font-size: 11px; color: #9CA3AF; text-align: right; margin-top: 4px;">NO_RESULTS</div>
+                </div>
+            `;
+        } else {
+            htmlContent = `
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div class="social-metric"><span class="social-metric-label">Durum</span><span class="social-metric-value">${statusIcon} ${data.access_status}</span></div>
+                    <div class="social-metric"><span class="social-metric-label">Aranan sorgu</span><span class="social-metric-value">${data.scanned_queries}</span></div>
+                    <div class="social-metric"><span class="social-metric-label">Bulunan içerik</span><span class="social-metric-value">${data.total_found + (data.unreadable_count || 0)}</span></div>
+                    <div class="social-metric"><span class="social-metric-label">Duplicate</span><span class="social-metric-value">${data.duplicate_count}</span></div>
+                    <div class="social-metric"><span class="social-metric-label">Yeni kayıt</span><span class="social-metric-value">${data.new_count}</span></div>
+                    ${data.message ? `<div style="margin-top: 12px; padding: 12px; background: #F3F4F6; border-radius: 8px; font-size: 13px;"><strong>Sebep:</strong> ${data.message}</div>` : ''}
+                </div>
+            `;
+        }
+        showEnterpriseModal("X İçerik Keşfi Sonucu", htmlContent, false, btnElement);
         
     } catch(e) {
         showEnterpriseModal("Hata", `Bağlantı hatası: ${e.message}`, false, btnElement);
