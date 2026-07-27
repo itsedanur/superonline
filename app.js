@@ -303,10 +303,10 @@ function switchTab(tabId) {
     if (activeTab) activeTab.classList.add("active");
 
     const titleMap = {
-        "executive": "Yönetici Paneli & AI İçgörü Motoru (Executive)",
+        "executive": "Yönetici Paneli & AI İçgörü Motoru",
         "dashboard": "Turkcell Superonline Genel Bakış (KPI)",
-        "live-analyzer": "Canlı AI / LLM Bağlam & Çoklu Ürün Analiz Testi (Phase 2.1)",
-        "review-queue": "Manuel İnceleme Kuyruğu (Phase 2.2)",
+        "live-analyzer": "Canlı AI / LLM Bağlam & Çoklu Ürün Analiz Testi",
+        "review-queue": "Manuel İnceleme Kuyruğu",
         "complaints-db": "Veritabanı & Şikayet Kayıtları"
     };
     document.getElementById("page-title").innerText = titleMap[tabId] || "Superonline AI Platform";
