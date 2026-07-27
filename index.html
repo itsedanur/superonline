@@ -104,7 +104,7 @@
                     <h1 id="page-title">Yönetici Paneli</h1>
                     <p class="subtitle">Şikayet Analizi ve Operasyonel Karar Destek Platformu</p>
                 </div>
-                <div class="header-actions">
+                <div class="header-actions" id="global-header-actions">
                     <button id="btn-prototype-scrape" type="button" class="btn btn-outline">
                         ⚡ Canlı Veri Toplama
                     </button>
@@ -901,19 +901,20 @@
 
             <!-- TAB: SOCIAL MEDIA PROVIDERS -->
             <section id="tab-social-providers" class="tab-content">
-                <div class="header-banner glass" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; padding: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
                     <div>
-                        <h2>🌐 Sosyal Medya Kaynakları</h2>
-                        <p style="color: var(--text-muted); font-size: 0.95rem; margin-top: 4px;">DSS ürünleri hakkında sosyal medyadan akan verileri yönetin.</p>
+                        <h2 style="font-size: 28px; font-weight: 600; color: #1F2937; margin: 0 0 4px 0;">Sosyal Medya Kaynakları</h2>
+                        <p style="font-size: 15px; font-weight: 400; color: #6B7280; margin: 0;">DSS ürünleri için sosyal medya veri sağlayıcılarını yönetin.</p>
                     </div>
-                    <button class="btn btn-outline" onclick="loadSocialProvidersStatus()" style="padding: 8px 16px;">🔄 Durumu Yenile</button>
+                    <button class="btn btn-outline" onclick="loadSocialProvidersStatus()" style="padding: 8px 16px;">Durumu Yenile</button>
                 </div>
                 
-                <div id="social-providers-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                <div id="social-providers-grid" class="social-grid">
                     <!-- Providers will be injected here by app.js -->
                 </div>
-                <div style="margin-top: 24px; padding: 16px; background: rgba(56, 189, 248, 0.1); border-left: 4px solid var(--turkcell-blue); border-radius: 4px; font-size: 0.9rem;">
-                    <strong style="color: var(--turkcell-blue);">Bilgi:</strong> API bağlantıları, veri çekme mantıkları ve webhook entegrasyonları sonraki aşamada (Part 2B/2C) aktif edilecektir. Şu anki tüm servisler bekleme (disabled) modundadır.
+                <div style="margin-top: 32px; padding: 12px 16px; font-size: 14px; color: #6B7280; display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <span>Sosyal medya sağlayıcıları modüler yapıdadır. Aktif olmayan sağlayıcılar sonraki fazlarda etkinleştirilecektir.</span>
                 </div>
             </section>
 
@@ -1063,6 +1064,26 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-outline" onclick="closeReviewHistoryModal()">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ENTERPRISE ALERT MODAL (Replaces window.alert) -->
+    <div id="enterprise-alert-modal" class="modal-backdrop hidden" style="backdrop-filter: blur(4px);" role="dialog" aria-modal="true" aria-labelledby="ea-title">
+        <div class="modal-box" style="max-width: 500px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color); padding: 16px 20px; flex-shrink: 0;">
+                <h3 id="ea-title" style="margin:0; font-size: 1.1rem; color: #1F2937; display: flex; align-items: center; gap: 8px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <span>Bilgi</span>
+                </h3>
+                <button type="button" class="btn-close" onclick="closeEnterpriseModal()" style="font-size: 1.2rem;" aria-label="Kapat">✕</button>
+            </div>
+            <div class="modal-body" id="ea-body" style="padding: 20px; font-size: 0.95rem; color: #4B5563; overflow-y: auto;">
+                <!-- Content will be injected here -->
+            </div>
+            <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-color); background: #F8FAFC; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; justify-content: flex-end; flex-shrink: 0;">
+                <button type="button" class="btn btn-outline" id="ea-cancel-btn" onclick="closeEnterpriseModal()" style="display: none; margin-right: 12px;">İptal</button>
+                <button type="button" class="btn btn-primary" onclick="closeEnterpriseModal()" id="ea-ok-btn">Tamam</button>
             </div>
         </div>
     </div>

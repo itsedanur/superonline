@@ -272,6 +272,8 @@ function switchTab(tabId) {
     const activeBtn = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
     if (activeBtn) activeBtn.classList.add("active");
 
+    document.body.setAttribute("data-active-tab", tabId);
+
     if (tabId.startsWith("product-")) {
         const subProd = tabId.replace("product-", "");
         window.location.hash = `#/products/${subProd}`;
@@ -1691,35 +1693,241 @@ async function loadSocialProvidersStatus() {
         
         data.providers.forEach(p => {
             const isEnabled = p.enabled;
-            const statusColor = isEnabled ? "var(--turkcell-blue)" : "var(--text-muted)";
-            const statusText = isEnabled ? "Aktif" : "Devre Dışı";
-            const icon = p.platform === "X" ? "🐦" : 
-                         p.platform === "INSTAGRAM" ? "📸" :
-                         p.platform === "FACEBOOK" ? "👥" : 
-                         p.platform === "TIKTOK" ? "🎵" : "🌐";
-                         
+            const badgeClass = isEnabled ? (p.prototype ? "badge-prototype" : "badge-active") : "badge-disabled";
+            const statusText = isEnabled ? (p.prototype ? "Prototype Ready" : "Active") : "Disabled";
+            
+            let iconSvg = '';
+            if (p.platform === "X") {
+                iconSvg = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
+            } else if (p.platform === "INSTAGRAM") {
+                iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>`;
+            } else if (p.platform === "FACEBOOK") {
+                iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>`;
+            } else if (p.platform === "TIKTOK") {
+                iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>`;
+            } else {
+                iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
+            }
+            
+            let buttonsHtml = `
+                <button class="btn btn-ghost" disabled>Bağlantıyı Test Et</button>
+                <button class="btn btn-outline" disabled>Ön İzleme</button>
+                <button class="btn btn-primary" disabled>İçe Aktar</button>
+            `;
+            
+            if (p.platform === "X" && isEnabled && p.prototype) {
+                buttonsHtml = `
+                    <button class="btn btn-ghost" onclick="previewXPrototype(this)">Bağlantıyı Test Et</button>
+                    <button class="btn btn-outline" onclick="previewXPrototype(this)">Ön İzleme</button>
+                    <button id="btn-import-x" class="btn btn-primary" onclick="importXPrototype()" disabled>İçe Aktar</button>
+                `;
+            }
+
+            const methodStr = p.prototype ? 'Free Web Discovery' : 'Resmi API';
+            const statusStr = isEnabled ? (p.prototype ? 'Beklemede' : 'Aktif') : 'Devre Dışı';
+            
             grid.innerHTML += `
-                <div class="kpi-card glass" style="border-left: 4px solid ${statusColor};">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div style="font-size: 2rem;">${icon}</div>
-                        <span class="badge-sent" style="background: rgba(148, 163, 184, 0.2); color: ${statusColor};">${statusText}</span>
+                <div class="social-card">
+                    <div class="social-card-header">
+                        <div class="social-card-icon">
+                            ${iconSvg}
+                            <h4 class="social-card-title">${p.platform}</h4>
+                        </div>
+                        <span class="status-badge ${badgeClass}">${statusText}</span>
                     </div>
-                    <div style="margin-top: 16px;">
-                        <h4 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">${p.platform}</h4>
-                        <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
-                            Configured: ${p.configured ? 'Evet' : 'Hayır'}<br>
-                            Ready: ${p.ready ? 'Evet' : 'Hayır'}
-                        </p>
+                    
+                    <div class="social-card-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div>
+                            <div class="social-metric-label" style="font-size:12px; margin-bottom: 2px;">Yöntem</div>
+                            <div class="social-metric-value" style="text-align: left;">${methodStr}</div>
+                        </div>
+                        <div>
+                            <div class="social-metric-label" style="font-size:12px; margin-bottom: 2px;">Durum</div>
+                            <div class="social-metric-value" style="text-align: left;">${statusStr}</div>
+                        </div>
+                        <div>
+                            <div class="social-metric-label" style="font-size:12px; margin-bottom: 2px;">Son Senkronizasyon</div>
+                            <div class="social-metric-value" style="text-align: left;">-</div>
+                        </div>
+                        <div>
+                            <div class="social-metric-label" style="font-size:12px; margin-bottom: 2px;">Toplanan İçerik</div>
+                            <div class="social-metric-value" style="text-align: left;">0</div>
+                        </div>
                     </div>
-                    <div style="margin-top: 16px;">
-                        <button class="btn btn-outline" style="width: 100%; opacity: 0.6; cursor: not-allowed;" disabled>Bağlan (Sonraki Aşamada)</button>
+                    
+                    <div class="social-card-actions">
+                        ${buttonsHtml}
                     </div>
                 </div>
             `;
         });
         
+        if (data.providers.length === 0) {
+            grid.innerHTML = `
+                <div style="grid-column: 1 / -1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 40px; border: 1px dashed var(--border-color); border-radius: 12px; color: var(--text-muted);">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px; opacity: 0.5;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <div style="font-size: 15px; font-weight: 500;">Henüz içerik bulunamadı</div>
+                    <div style="font-size: 13px; margin-top: 4px;">Konfigürasyonları kontrol edin.</div>
+                </div>
+            `;
+        }
+        
     } catch (e) {
         grid.innerHTML = `<div style='color: #F87171;'>Sunucuya bağlanılamadı: ${e.message}</div>`;
         console.error("Provider status hatası:", e);
+    }
+}
+
+let lastPreviewItems = [];
+
+async function previewXPrototype(btnElement) {
+    const btnImport = document.getElementById("btn-import-x");
+    if (btnImport) btnImport.disabled = true;
+    
+    let btnPreview = btnElement || document.querySelector("button[onclick^='previewXPrototype']");
+    let originalHtml = "Ön İzleme";
+    if (btnPreview) {
+        originalHtml = btnPreview.innerHTML;
+        btnPreview.disabled = true;
+        btnPreview.innerHTML = `<span class="spinner" style="margin-right: 8px;"></span> Lütfen bekleyin...`;
+    }
+
+    
+    try {
+        const res = await fetch(`${API_BASE}/api/v1/social/x/prototype/preview`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ max_results_per_query: 5 }) // Small limit for testing
+        });
+        
+        if (!res.ok) {
+            const err = await res.json();
+            showEnterpriseModal("Hata", "Ön izleme hatası: " + (err.error || res.status));
+            return;
+        }
+        
+        const data = await res.json();
+        
+        if (data.new_count > 0 && data.preview_items && data.preview_items.length > 0) {
+            lastPreviewItems = data.preview_items;
+            if (btnImport) btnImport.disabled = false;
+        }
+        
+        let statusIcon = '<span class="status-dot status-dot-warning" aria-label="Uyarı"></span>';
+        if (data.total_found > 0) statusIcon = '<span class="status-dot status-dot-success" aria-label="Başarılı"></span>';
+        if (data.access_status === "UNKNOWN_ERROR" || data.access_status === "CAPTCHA_DETECTED") {
+            statusIcon = '<span class="status-dot status-dot-error" aria-label="Hata"></span>';
+        }
+        
+        const htmlContent = `
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div class="social-metric"><span class="social-metric-label">Durum</span><span class="social-metric-value">${statusIcon} ${data.access_status === "NO_RESULTS" ? "Sonuç bulunamadı" : data.access_status}</span></div>
+                <div class="social-metric"><span class="social-metric-label">Aranan sorgu</span><span class="social-metric-value">${data.scanned_queries}</span></div>
+                <div class="social-metric"><span class="social-metric-label">Bulunan içerik</span><span class="social-metric-value">${data.total_found + (data.unreadable_count || 0)}</span></div>
+                <div class="social-metric"><span class="social-metric-label">Duplicate</span><span class="social-metric-value">${data.duplicate_count}</span></div>
+                <div class="social-metric"><span class="social-metric-label">Yeni kayıt</span><span class="social-metric-value">${data.new_count}</span></div>
+                ${data.message ? `<div style="margin-top: 12px; padding: 12px; background: #F3F4F6; border-radius: 8px; font-size: 13px;"><strong>Sebep:</strong> ${data.message}</div>` : ''}
+            </div>
+        `;
+        showEnterpriseModal("X Veri Toplama Sonucu", htmlContent, false, btnElement);
+        
+    } catch(e) {
+        showEnterpriseModal("Hata", `Bağlantı hatası: ${e.message}`, false, btnElement);
+    } finally {
+        if(btnPreview) {
+            btnPreview.disabled = false;
+            btnPreview.innerHTML = originalHtml;
+        }
+    }
+}
+
+async function importXPrototype() {
+    const btnImport = document.getElementById("btn-import-x");
+    if (!lastPreviewItems || lastPreviewItems.length === 0) {
+        showEnterpriseModal("Bilgi", "Aktarılacak yeni kayıt yok.", false, btnImport);
+        return;
+    }
+    
+    const originalHtml = btnImport.innerHTML;
+    btnImport.disabled = true;
+    btnImport.innerHTML = `<span class="spinner" style="margin-right: 8px;"></span> Aktarılıyor...`;
+    
+    try {
+        const res = await fetch(`${API_BASE}/api/v1/social/x/prototype/import`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: lastPreviewItems })
+        });
+        
+        const data = await res.json();
+        if (res.ok) {
+            showEnterpriseModal("Başarılı", `<div style="text-align:center; padding: 20px;"><svg style="color: #16A34A; width: 48px; height: 48px; margin-bottom: 12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg><div>${data.message}</div></div>`, false, btnImport);
+            lastPreviewItems = [];
+        } else {
+            showEnterpriseModal("Hata", "Aktarma hatası: " + data.error, false, btnImport);
+            btnImport.disabled = false;
+        }
+    } catch(e) {
+        showEnterpriseModal("Hata", "Bağlantı hatası: " + e.message, false, btnImport);
+        btnImport.disabled = false;
+    } finally {
+        btnImport.innerHTML = originalHtml;
+    }
+}
+
+let lastFocusedElement = null;
+
+function showEnterpriseModal(title, htmlContent, showCancel = false, triggerElement = null) {
+    const modal = document.getElementById("enterprise-alert-modal");
+    if (!modal) return;
+    
+    if (triggerElement) {
+        lastFocusedElement = triggerElement;
+    } else {
+        lastFocusedElement = document.activeElement;
+    }
+    
+    document.getElementById("ea-title").innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        <span>${title}</span>
+    `;
+    document.getElementById("ea-body").innerHTML = htmlContent;
+    
+    const cancelBtn = document.getElementById("ea-cancel-btn");
+    if (showCancel) {
+        cancelBtn.style.display = "inline-block";
+    } else {
+        cancelBtn.style.display = "none";
+    }
+    
+    modal.classList.remove("hidden");
+    
+    const okBtn = document.getElementById("ea-ok-btn");
+    if(okBtn) okBtn.focus();
+    
+    const escListener = (e) => {
+        if (e.key === "Escape") {
+            closeEnterpriseModal();
+            document.removeEventListener("keydown", escListener);
+        }
+    };
+    document.addEventListener("keydown", escListener);
+    
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            closeEnterpriseModal();
+        }
+    };
+}
+
+function closeEnterpriseModal() {
+    const modal = document.getElementById("enterprise-alert-modal");
+    if (modal) {
+        modal.classList.add("hidden");
+        modal.onclick = null;
+    }
+    if (lastFocusedElement) {
+        lastFocusedElement.focus();
+        lastFocusedElement = null;
     }
 }

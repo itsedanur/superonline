@@ -43,3 +43,4 @@ playwright-report/
 test-results/
 screenshots/
 tmp/
+*.png
