@@ -659,8 +659,7 @@ class EnterpriseDatabase:
             cursor = conn.cursor()
             query = """
                 SELECT * FROM complaints 
-                WHERE (needs_human_review = 1 OR product_conflict = 1 OR primary_product = 'Belirlenemedi' OR review_status = 'PENDING' OR confidence_score < 0.85)
-                  AND review_status != 'DELETED'
+                WHERE review_status = 'PENDING'
             """
             params = []
 
@@ -713,6 +712,50 @@ class EnterpriseDatabase:
                 results.append(item)
             return results
 
+    def get_reviewed_complaints(self, product_filter="ALL", status_filter="ALL", date_range="ALL"):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = """
+                SELECT * FROM complaints 
+                WHERE review_status IN ('APPROVED', 'CORRECTED', 'REANALYZED', 'REJECTED')
+            """
+            params = []
+
+            if product_filter != "ALL":
+                query += " AND (primary_product = ? OR source_product = ?)"
+                params.extend([product_filter, product_filter])
+
+            if status_filter != "ALL":
+                query += " AND review_status = ?"
+                params.append(status_filter)
+
+            now = datetime.now()
+            if date_range == "TODAY":
+                query += " AND reviewed_at >= ?"
+                params.append(f"{now.strftime('%Y-%m-%d')} 00:00:00")
+            elif date_range == "WEEK":
+                week_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+                query += " AND reviewed_at >= ?"
+                params.append(f"{week_ago} 00:00:00")
+            elif date_range == "MONTH":
+                month_ago = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+                query += " AND reviewed_at >= ?"
+                params.append(f"{month_ago} 00:00:00")
+
+            query += " ORDER BY reviewed_at DESC"
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
+            results = []
+            for row in rows:
+                item = dict(row)
+                try:
+                    item["products"] = json.loads(item["products_json"])
+                except Exception:
+                    item["products"] = [item["primary_product"]]
+                results.append(item)
+            return results
+
     def approve_complaint(self, complaint_id, reviewed_by="Uzman Analist"):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -726,14 +769,14 @@ class EnterpriseDatabase:
             cursor.execute("""
                 UPDATE complaints SET 
                     needs_human_review = 0,
-                    review_status = 'AI_RESULT_APPROVED',
+                    review_status = 'APPROVED',
                     reviewed_at = ?,
                     reviewed_by = ?
                 WHERE id = ?
             """, (now_str, reviewed_by, complaint_id))
             conn.commit()
 
-            self.add_review_history(complaint_id, "APPROVE", old_values={"review_status": old_data["review_status"]}, new_values={"review_status": "AI_RESULT_APPROVED"}, note="AI sonucu uzman tarafından onaylandı", reviewed_by=reviewed_by)
+            self.add_review_history(complaint_id, "APPROVE", old_values={"review_status": old_data["review_status"]}, new_values={"review_status": "APPROVED"}, note="AI sonucu uzman tarafından onaylandı", reviewed_by=reviewed_by)
             return True, "Kayıt onaylandı"
 
     def review_and_correct_complaint(self, complaint_id, update_dict, reviewed_by="Uzman Analist"):
@@ -783,7 +826,7 @@ class EnterpriseDatabase:
                     emotion = ?,
                     urgency = ?,
                     needs_human_review = 0,
-                    review_status = 'MANUALLY_CORRECTED',
+                    review_status = 'CORRECTED',
                     review_note = ?,
                     reviewed_at = ?,
                     reviewed_by = ?,
@@ -814,10 +857,31 @@ class EnterpriseDatabase:
     def defer_complaint(self, complaint_id, note="İnceleme ertelendi", reviewed_by="Uzman Analist"):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("UPDATE complaints SET review_status = 'DEFERRED', review_note = ? WHERE id = ?", (note, complaint_id))
+            cursor.execute("UPDATE complaints SET review_status = 'PENDING', review_note = ? WHERE id = ?", (note, complaint_id))
             conn.commit()
             self.add_review_history(complaint_id, "DEFER", note=note, reviewed_by=reviewed_by)
             return True, "İncelenme ertelendi"
+
+    def reject_complaint(self, complaint_id, note="Kayıt reddedildi", reviewed_by="Uzman Analist"):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM complaints WHERE id = ?", (complaint_id,))
+            old_row = cursor.fetchone()
+            if not old_row: return False, "Kayıt bulunamadı"
+
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute("""
+                UPDATE complaints SET 
+                    needs_human_review = 0,
+                    review_status = 'REJECTED',
+                    review_note = ?,
+                    reviewed_at = ?,
+                    reviewed_by = ?
+                WHERE id = ?
+            """, (note, now_str, reviewed_by, complaint_id))
+            conn.commit()
+            self.add_review_history(complaint_id, "REJECT", old_values={"review_status": old_row["review_status"]}, new_values={"review_status": "REJECTED"}, note=note, reviewed_by=reviewed_by)
+            return True, "Kayıt reddedildi"
 
     def delete_complaint(self, complaint_id, reviewed_by="Uzman Analist"):
         with self.get_connection() as conn:

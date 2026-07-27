@@ -92,6 +92,8 @@ function handleHashRouting() {
         loadScrapeRunDetail(runId);
     } else if (hash === "review-queue") {
         switchTab("review-queue");
+    } else if (hash === "reviewed-complaints") {
+        switchTab("reviewed-complaints");
     } else if (hash === "live-analyzer") {
         switchTab("live-analyzer");
     } else if (hash.startsWith("products/")) {
@@ -295,6 +297,8 @@ function switchTab(tabId) {
         window.location.hash = "#/dashboard";
     } else if (tabId === "review-queue") {
         window.location.hash = "#/review-queue";
+    } else if (tabId === "reviewed-complaints") {
+        window.location.hash = "#/reviewed-complaints";
     } else if (tabId === "live-analyzer") {
         window.location.hash = "#/live-analyzer";
     }
@@ -307,12 +311,15 @@ function switchTab(tabId) {
         "dashboard": "Turkcell Superonline Genel Bakış (KPI)",
         "live-analyzer": "Canlı AI / LLM Bağlam & Çoklu Ürün Analiz Testi",
         "review-queue": "Manuel İnceleme Kuyruğu",
+        "reviewed-complaints": "İncelenen Şikâyetler",
         "complaints-db": "Veritabanı & Şikayet Kayıtları"
     };
     document.getElementById("page-title").innerText = titleMap[tabId] || "Superonline AI Platform";
 
     if (tabId === "review-queue") {
         loadReviewQueueData();
+    } else if (tabId === "reviewed-complaints") {
+        loadReviewedComplaints();
     } else if (tabId === "complaints-db" || tabId === "dashboard") {
         filterComplaintsTable();
     }
@@ -838,6 +845,13 @@ async function submitApproveAiReview() {
         if (res.ok) {
             alert(`✅ ${currentActiveItem.id} AI sonucu başarıyla onaylandı.`);
             closeReviewDetailModal();
+
+            // Instantly remove from DOM
+            const row = document.querySelector(`tr:has(button[data-complaint-id="${currentActiveItem.id}"])`);
+            if(row) row.remove();
+            const badge = document.getElementById("nav-review-badge");
+            if(badge) badge.innerText = Math.max(0, parseInt(badge.innerText)-1);
+
             loadReviewQueueData();
             loadDashboardData();
         }
@@ -860,16 +874,26 @@ async function submitEditReview() {
     };
 
     try {
-        const res = await fetch(`${API_BASE}/api/v1/complaints/${currentActiveItem.id}/review`, {
-            method: "PUT",
+        const res = await fetch(`${API_BASE}/api/v1/complaints/${currentActiveItem.id}/correct`, {
+            method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
         if (res.ok) {
             alert(`✏️ ${currentActiveItem.id} kaydı başarıyla düzenlendi ve onaylandı.`);
             closeReviewDetailModal();
+            
+            // Instantly remove from DOM
+            const row = document.querySelector(`tr:has(button[data-complaint-id="${currentActiveItem.id}"])`);
+            if(row) row.remove();
+            const badge = document.getElementById("nav-review-badge");
+            if(badge) badge.innerText = Math.max(0, parseInt(badge.innerText)-1);
+
             loadReviewQueueData();
             loadDashboardData();
+            if (document.getElementById("tab-reviewed-complaints")?.classList.contains("active")) {
+                loadReviewedComplaints();
+            }
         } else {
             const errData = await res.json();
             alert(`Hata: ${errData.error}`);
@@ -892,8 +916,21 @@ async function submitReanalyzeReview() {
                 <div><strong>Eski AI Ürün:</strong> ${data.oldResult.primaryProduct} ➔ <strong>Yeni AI Ürün:</strong> ${data.newResult.primaryProduct}</div>
                 <div><strong>Eski Kategori:</strong> ${data.oldResult.mainCategory} ➔ <strong>Yeni Kategori:</strong> ${data.newResult.mainCategory}</div>
                 <div><strong>Yeni Güven Skoru:</strong> ${data.newResult.confidence}</div>
+                <div style="margin-top:8px; color:#10B981; font-weight:bold;">Yeniden analiz sonuçları kaydedildi!</div>
             `;
             compBox.classList.remove("hidden");
+            
+            // Instantly remove from DOM
+            const row = document.querySelector(`tr:has(button[data-complaint-id="${currentActiveItem.id}"])`);
+            if(row) row.remove();
+            const badge = document.getElementById("nav-review-badge");
+            if(badge) badge.innerText = Math.max(0, parseInt(badge.innerText)-1);
+            
+            setTimeout(() => {
+                closeReviewDetailModal();
+                loadReviewQueueData();
+                loadDashboardData();
+            }, 3000);
         }
     } catch (e) {
         alert("Yeniden analiz hatası.");
@@ -921,20 +958,32 @@ async function submitDeferReview() {
     }
 }
 
-async function submitDeleteReview() {
+async function submitRejectReview() {
     if (!currentActiveItem) return;
-    if (!confirm(`${currentActiveItem.id} kaydını silmek istediğinize emin misiniz?`)) return;
+    const note = prompt("Reddetme sebebini yazın:", "Geçersiz veya alakasız kayıt");
+    if (note === null) return;
 
     try {
-        const res = await fetch(`${API_BASE}/api/v1/complaints/${currentActiveItem.id}`, { method: "DELETE" });
+        const res = await fetch(`${API_BASE}/api/v1/complaints/${currentActiveItem.id}/reject`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ note })
+        });
         if (res.ok) {
-            alert(`🗑️ ${currentActiveItem.id} kaydı silindi.`);
+            alert(`❌ ${currentActiveItem.id} kaydı reddedildi.`);
             closeReviewDetailModal();
+            
+            // Instantly remove from DOM
+            const row = document.querySelector(`tr:has(button[data-complaint-id="${currentActiveItem.id}"])`);
+            if(row) row.remove();
+            const badge = document.getElementById("nav-review-badge");
+            if(badge) badge.innerText = Math.max(0, parseInt(badge.innerText)-1);
+
             loadReviewQueueData();
             loadDashboardData();
         }
     } catch (e) {
-        alert("Silme hatası.");
+        alert("Reddetme hatası.");
     }
 }
 
@@ -1400,6 +1449,7 @@ document.addEventListener("click", async (event) => {
     if (event.target.classList.contains("modal-backdrop")) {
         closeReviewDetailModal();
         closeComplaintDetailModal();
+        closeReviewHistoryModal();
     }
 
     const reviewBtn = event.target.closest("[data-action='review-complaint']");
@@ -1417,6 +1467,14 @@ document.addEventListener("click", async (event) => {
             await openComplaintDetailModal(complaintId);
         }
     }
+
+    const historyBtn = event.target.closest("[data-action='view-history']");
+    if (historyBtn) {
+        const complaintId = historyBtn.dataset.complaintId;
+        if (complaintId) {
+            await openReviewHistoryModal(complaintId);
+        }
+    }
 });
 
 // Close Modals on ESC key
@@ -1424,6 +1482,7 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
         closeReviewDetailModal();
         closeComplaintDetailModal();
+        closeReviewHistoryModal();
     }
 });
 
@@ -1476,9 +1535,105 @@ async function openComplaintDetailModal(id) {
     }
 }
 
-function closeComplaintDetailModal() {
-    const modal = document.getElementById("modal-complaint-detail");
-    if (modal) {
-        modal.classList.add("hidden");
+// ================= REVIEWED COMPLAINTS LOGIC =================
+let currentReviewedComplaints = [];
+
+async function loadReviewedComplaints() {
+    filterReviewedComplaints();
+}
+
+async function filterReviewedComplaints() {
+    const prod = document.getElementById("rc-filter-product")?.value || "ALL";
+    const status = document.getElementById("rc-filter-status")?.value || "ALL";
+    const dateRange = document.getElementById("rc-filter-date")?.value || "ALL";
+
+    try {
+        const url = `${API_BASE}/api/v1/reviewed-complaints?product=${encodeURIComponent(prod)}&status=${encodeURIComponent(status)}&date_range=${encodeURIComponent(dateRange)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("API hatası");
+        
+        currentReviewedComplaints = await res.json();
+        populateReviewedTable(currentReviewedComplaints);
+        
+        // Update KPIs
+        document.getElementById("rc-kpi-total").innerText = currentReviewedComplaints.length;
+        document.getElementById("rc-kpi-approved").innerText = currentReviewedComplaints.filter(c => c.reviewStatus === 'APPROVED').length;
+        document.getElementById("rc-kpi-corrected").innerText = currentReviewedComplaints.filter(c => c.reviewStatus === 'CORRECTED').length;
+        document.getElementById("rc-kpi-reanalyzed").innerText = currentReviewedComplaints.filter(c => c.reviewStatus === 'REANALYZED').length;
+        
+    } catch (e) {
+        console.error("filterReviewedComplaints error", e);
     }
+}
+
+function populateReviewedTable(data) {
+    const tbody = document.getElementById("rc-tbody");
+    if (!tbody) return;
+    tbody.innerHTML = "";
+
+    if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;">İncelenen kayıt bulunamadı.</td></tr>`;
+        return;
+    }
+
+    data.forEach(item => {
+        const tr = document.createElement("tr");
+        const statusColors = {
+            'APPROVED': '#10B981',
+            'CORRECTED': '#F59E0B',
+            'REANALYZED': '#3B82F6',
+            'REJECTED': '#EF4444'
+        };
+        const color = statusColors[item.reviewStatus] || '#6B7280';
+        
+        const aiProd = item.products ? item.products.join(", ") : item.primaryProduct;
+        const finalProd = item.finalProduct || item.primaryProduct;
+        
+        tr.innerHTML = `
+            <td><strong style="color: var(--turkcell-blue); cursor: pointer;" data-action="view-complaint" data-complaint-id="${item.id}">${item.id}</strong></td>
+            <td>${item.sourceProduct || '-'}</td>
+            <td>${aiProd}</td>
+            <td><strong>${finalProd}</strong></td>
+            <td><div style="font-weight:600;">${item.mainCategory}</div><div style="font-size:0.75rem;">${item.subCategory}</div></td>
+            <td><span class="badge-sent ${item.urgency==='High'||item.urgency==='Critical'?'negative':'positive'}">${item.urgency}</span> / ${item.sentiment}</td>
+            <td>${item.confidence}</td>
+            <td><span style="color:${color}; font-weight:bold;">${item.reviewStatus}</span></td>
+            <td><div style="font-size:0.8rem;">${item.reviewedAt || '-'}</div></td>
+            <td>${item.reviewedBy || '-'}</td>
+            <td style="display: flex; gap: 4px;">
+                <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.75rem;" data-action="view-history" data-complaint-id="${item.id}">Geçmiş</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function openReviewHistoryModal(id) {
+    try {
+        const res = await fetch(`${API_BASE}/api/v1/complaints/${id}/review-history`);
+        if (res.ok) {
+            const history = await res.json();
+            const content = document.getElementById("rh-content");
+            if (history.length === 0) {
+                content.innerHTML = "<p>Geçmiş bulunamadı.</p>";
+            } else {
+                content.innerHTML = history.map(h => `
+                    <div style="border-left: 3px solid var(--turkcell-blue); padding-left: 12px; margin-bottom: 12px;">
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">${h.reviewed_at} - <strong>${h.action}</strong> (${h.reviewed_by})</div>
+                        <div style="font-size: 0.9rem; margin-top: 4px;">Not: ${h.note || '-'}</div>
+                        ${h.old_values ? `<div style="font-size: 0.8rem; color: #EF4444; margin-top:4px;">Eski: ${JSON.stringify(h.old_values)}</div>` : ''}
+                        ${h.new_values ? `<div style="font-size: 0.8rem; color: #10B981;">Yeni: ${JSON.stringify(h.new_values)}</div>` : ''}
+                    </div>
+                `).join("");
+            }
+            document.getElementById("modal-review-history").classList.remove("hidden");
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function closeReviewHistoryModal() {
+    const modal = document.getElementById("modal-review-history");
+    if(modal) modal.classList.add("hidden");
 }

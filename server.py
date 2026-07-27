@@ -109,6 +109,16 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "stats": stats
             })
 
+        # GET /api/v1/reviewed-complaints
+        elif path == "/api/v1/reviewed-complaints":
+            prod = query.get("product", ["ALL"])[0]
+            status = query.get("status", ["ALL"])[0]
+            date_range = query.get("date_range", ["ALL"])[0]
+
+            reviewed_items = db.get_reviewed_complaints(product_filter=prod, status_filter=status, date_range=date_range)
+            formatted = [self.format_complaint_dict(c) for c in reviewed_items]
+            self.send_json_response(formatted)
+
         # GET /api/v1/review-stats
         elif path in ["/api/review-stats", "/api/v1/review-stats"]:
             self.send_json_response(db.get_review_stats())
@@ -285,6 +295,25 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self.send_json_response({"error": msg}, status=400)
 
+        # POST /api/v1/complaints/{id}/correct (was /review)
+        elif path.startswith("/api/v1/complaints/") and path.endswith("/correct"):
+            cid = path.replace("/api/v1/complaints/", "").replace("/correct", "").strip()
+            ok, msg = db.review_and_correct_complaint(cid, body)
+            if ok:
+                self.send_json_response({"message": msg, "id": cid})
+            else:
+                self.send_json_response({"error": msg}, status=400)
+
+        # POST /api/v1/complaints/{id}/reject
+        elif path.startswith("/api/v1/complaints/") and path.endswith("/reject"):
+            cid = path.replace("/api/v1/complaints/", "").replace("/reject", "").strip()
+            note = body.get("note", "Kayıt reddedildi")
+            ok, msg = db.reject_complaint(cid, note=note)
+            if ok:
+                self.send_json_response({"message": msg, "id": cid})
+            else:
+                self.send_json_response({"error": msg}, status=400)
+
         # POST /api/v1/complaints/{id}/defer
         elif path.startswith("/api/v1/complaints/") and path.endswith("/defer"):
             cid = path.replace("/api/v1/complaints/", "").replace("/defer", "").strip()
@@ -307,6 +336,22 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
             text = found["masked_content"] or found["raw_content"]
             new_res = ai_engine.analyze(text)
             
+            # Save the new result as REANALYZED
+            update_dict = {
+                "primaryProduct": new_res["primaryProduct"],
+                "mainCategory": new_res["mainCategory"],
+                "sentiment": new_res["sentiment"],
+                "urgency": new_res.get("urgency", "Medium"),
+                "emotion": new_res.get("emotion", "Nötr"),
+                "reviewNote": "Yeniden analiz yapıldı ve kaydedildi."
+            }
+            db.review_and_correct_complaint(cid, update_dict, reviewed_by="AI Engine")
+            # Update status to REANALYZED
+            with db.get_connection() as conn:
+                conn.execute("UPDATE complaints SET review_status = 'REANALYZED' WHERE id = ?", (cid,))
+                conn.commit()
+            db.add_review_history(cid, "REANALYZE", old_values={"primaryProduct": found["primary_product"]}, new_values={"primaryProduct": new_res["primaryProduct"]}, note="AI yeniden analizi yapıldı ve kaydedildi.")
+
             old_res = {
                 "primaryProduct": found["primary_product"],
                 "mainCategory": found["main_category"],
@@ -314,7 +359,7 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
             }
 
             self.send_json_response({
-                "message": "Yeniden analiz yapıldı",
+                "message": "Yeniden analiz yapıldı ve kaydedildi.",
                 "oldResult": old_res,
                 "newResult": new_res
             })
