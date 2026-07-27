@@ -1446,10 +1446,19 @@ async function loadExecutiveDashboardData() {
 // Global Event Delegation for Dynamic Elements
 document.addEventListener("click", async (event) => {
     // Modal background click to close
-    if (event.target.classList.contains("modal-backdrop")) {
+    if (event.target.classList.contains("modal-backdrop") || event.target.id === "modal-complaint-detail") {
         closeReviewDetailModal();
         closeComplaintDetailModal();
         closeReviewHistoryModal();
+    }
+
+    if (
+        event.target.closest("#complaint-detail-close") ||
+        event.target.closest("#complaint-detail-close-footer")
+    ) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeComplaintDetailModal();
     }
 
     const reviewBtn = event.target.closest("[data-action='review-complaint']");
@@ -1476,6 +1485,14 @@ document.addEventListener("click", async (event) => {
         }
     }
 });
+
+function closeComplaintDetailModal() {
+    const modal = document.getElementById('modal-complaint-detail');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    document.body.classList.remove('modal-open');
+    document.body.style.overflow = '';
+}
 
 // Close Modals on ESC key
 document.addEventListener("keydown", (event) => {
