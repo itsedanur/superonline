@@ -1,0 +1,45 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# SQLite Databases & Backups
+*.db
+*.db.bak
+*.sqlite
+*.sqlite3
+data/
+instance/
+
+# Python Cache & Coverage
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Node & Dependencies
+node_modules/
+
+# Logs & Temporary Output
+*.log
+logs/
+
+# System Files & IDE Configs
+.DS_Store
+.DS_Store?
+.idea/
+.vscode/
+
+# Playwright & Testing Reports
+playwright-report/
+test-results/
+screenshots/
+tmp/

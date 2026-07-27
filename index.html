@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turkcell Superonline - Kurumsal Şikayet & AI Ürün Analiz Platformu</title>
+    <!-- Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-logo">
+                    <span class="yellow-dot"></span>
+                    <span class="brand-name">SUPERONLINE</span>
+                </div>
+                <span class="badge enterprise">ENTERPRISE AI v3.2</span>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item" data-tab="executive">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                    <span>Yönetici Paneli (Executive)</span>
+                </button>
+
+                <button class="nav-item active" data-tab="dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    <span>Genel Bakış (KPI)</span>
+                </button>
+
+                <div class="nav-section-title" style="font-size: 0.72rem; color: var(--text-muted); padding: 12px 16px 4px 16px; text-transform: uppercase; font-weight: 700;">Ürün Detay Ekranları</div>
+                
+                <button class="nav-item" data-tab="product-fiber">
+                    <span style="color: #00A3E0;">⚡</span>
+                    <span>Fiber Detay</span>
+                </button>
+                <button class="nav-item" data-tab="product-superbox">
+                    <span style="color: #FFC72C;">📦</span>
+                    <span>Superbox Detay</span>
+                </button>
+                <button class="nav-item" data-tab="product-adsl">
+                    <span style="color: #A855F7;">🔌</span>
+                    <span>ADSL Detay</span>
+                </button>
+                <button class="nav-item" data-tab="product-compare">
+                    <span>📊</span>
+                    <span>Ürün Karşılaştırma</span>
+                </button>
+
+                <div class="nav-section-title" style="font-size: 0.72rem; color: var(--text-muted); padding: 12px 16px 4px 16px; text-transform: uppercase; font-weight: 700;">Operasyon & AI</div>
+
+                <button class="nav-item" data-tab="review-queue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    <span>Manuel İnceleme Kuyruğu</span>
+                    <span class="badge-count" id="nav-review-badge">0</span>
+                </button>
+                <button class="nav-item" data-tab="live-analyzer">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83"></path></svg>
+                    <span>Canlı AI Testi</span>
+                </button>
+                <button class="nav-item" data-tab="complaints-db">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                    <span>Tüm Veritabanı</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="db-status-card">
+                    <div class="db-indicator green"></div>
+                    <div class="db-info">
+                        <span class="db-title">LLM AI Persistent Engine</span>
+                        <span class="db-sub">Phase 2.3 Ürün Detay Aktif</span>
+                    </div>
+                </div>
+                <div class="user-info">
+                    <div class="avatar">TU</div>
+                    <div class="user-details">
+                        <span class="user-name">Turkcell Stajyer Projesi</span>
+                        <span class="user-role">Superonline AI Team</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-title">
+                    <h1 id="page-title">Turkcell Superonline Kurumsal Şikayet AI Analiz Platformu</h1>
+                    <p class="subtitle">Fiber, Superbox, DSL ve Genel Kategorilerde Çoklu Ürün Destekli LLM Bağlam Analizi</p>
+                </div>
+                <div class="header-actions">
+                    <button id="btn-prototype-scrape" type="button" class="btn btn-outline">
+                        ⚡ Prototip Canlı Veri Toplama
+                    </button>
+                    <button class="btn btn-primary" onclick="switchTab('live-analyzer')">
+                        🤖 AI Metin Analizi Yap
+                    </button>
+                </div>
+            </header>
+
+            <!-- TAB 0: EXECUTIVE DASHBOARD & AI INSIGHT ENGINE -->
+            <section id="tab-executive" class="tab-content">
+                <div class="header-banner glass" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.9)); border-left: 4px solid var(--turkcell-yellow);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h2>📊 Yönetici Paneli & AI İçgörü Motoru (C-Level Executive)</h2>
+                            <p class="subtitle" style="margin-top: 4px; color: #94A3B8;">Ürün Trendleri, Dönemsel Değişimler (% Büyüme) ve AI Tarafından Üretilen Operasyonel Risk Analizi</p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <span class="badge-prod superbox" style="font-size: 0.85rem; padding: 6px 12px;">🔴 Canlı İçgörü Motoru Aktif</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EXECUTIVE AI INSIGHTS PANEL -->
+                <div class="card glass" style="margin-bottom: 24px; border: 1px solid rgba(234,179,8,0.3); background: rgba(15,23,42,0.85);">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="color: var(--turkcell-yellow); display: flex; align-items: center; gap: 8px;">
+                            🤖 Executive AI İçgörü ve Eylem Önerileri
+                        </h3>
+                        <span style="font-size: 0.8rem; color: #94A3B8;">Otomatik Analiz Sürümü: v3.2-enterprise</span>
+                    </div>
+                    <div id="executive-ai-insights-container" style="padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+                        <div style="padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">Yükleniyor...</div>
+                    </div>
+                </div>
+
+                <!-- PERIOD-OVER-PERIOD GROWTH KPI GRID -->
+                <div class="kpi-grid">
+                    <div class="kpi-card glass highlight-blue">
+                        <div class="kpi-icon">📅</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Günlük Değişim (Bugün)</span>
+                            <span class="kpi-value" id="exec-daily-cnt">0</span>
+                            <span class="kpi-tag" id="exec-daily-pct">0%</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass highlight-green">
+                        <div class="kpi-icon">📈</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Haftalık Değişim (7 Gün)</span>
+                            <span class="kpi-value" id="exec-weekly-cnt">0</span>
+                            <span class="kpi-tag" id="exec-weekly-pct">0%</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass highlight-yellow">
+                        <div class="kpi-icon">🗓️</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Aylık Değişim (30 Gün)</span>
+                            <span class="kpi-value" id="exec-monthly-cnt">0</span>
+                            <span class="kpi-tag" id="exec-monthly-pct">0%</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass highlight-red">
+                        <div class="kpi-icon">🚨</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Kritik Şikâyet Oranı</span>
+                            <span class="kpi-value" id="exec-crit-ratio" style="color: #F87171;">0%</span>
+                            <span class="kpi-tag" id="exec-crit-cnt">0 Kritik</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass highlight-purple">
+                        <div class="kpi-icon">📦</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">En Problemli Ürün</span>
+                            <span class="kpi-value" id="exec-most-problematic" style="font-size: 1.3rem; color: #38BDF8;">-</span>
+                            <span class="kpi-tag">Aksiyon Gerekli</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EXECUTIVE CHARTS GRID -->
+                <div class="charts-grid" style="margin-top: 24px;">
+                    <div class="chart-card glass" style="grid-column: span 2;">
+                        <div class="chart-header">
+                            <h3>Ürün Bazlı Trend Karşılaştırması (Fiber vs Superbox vs ADSL)</h3>
+                            <span class="info-badge">Son 30 Günlük Zaman Serisi</span>
+                        </div>
+                        <div class="chart-container" style="height: 320px;">
+                            <canvas id="execProductTrendChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card glass">
+                        <div class="chart-header">
+                            <h3>En Çok Artan Şikâyet Konuları (Top 5 Surging Issues)</h3>
+                            <span class="info-badge">Haftalık Büyüme Oranı (%)</span>
+                        </div>
+                        <div class="chart-container" style="height: 320px;">
+                            <canvas id="execRisingCategoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 1: DASHBOARD -->
+            <section id="tab-dashboard" class="tab-content active">
+                <div class="kpi-grid">
+                    <div class="kpi-card glass brand-fiber" style="cursor: pointer;" onclick="switchTab('product-fiber')">
+                        <div class="kpi-icon">⚡</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Fiber Şikayetleri</span>
+                            <span class="kpi-value" id="kpi-fiber-cnt">0</span>
+                            <span class="kpi-tag">Detay Sayfasına Git ➔</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass brand-superbox" style="cursor: pointer;" onclick="switchTab('product-superbox')">
+                        <div class="kpi-icon">📦</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Superbox Şikayetleri</span>
+                            <span class="kpi-value" id="kpi-superbox-cnt">0</span>
+                            <span class="kpi-tag">Detay Sayfasına Git ➔</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass brand-dsl" style="cursor: pointer;" onclick="switchTab('product-adsl')">
+                        <div class="kpi-icon">🔌</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">ADSL Şikayetleri</span>
+                            <span class="kpi-value" id="kpi-adsl-cnt">0</span>
+                            <span class="kpi-tag">Detay Sayfasına Git ➔</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass highlight-yellow" style="cursor: pointer;" onclick="switchTab('review-queue')">
+                        <div class="kpi-icon">⚠️</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Manuel İnceleme Bekleyen</span>
+                            <span class="kpi-value" id="kpi-pending-review-cnt" style="color: #F87171;">0</span>
+                            <span class="kpi-tag">Tıklayıp Kuyruğa Git ➔</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kpi-grid" style="margin-top: -12px;">
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">Bugün İncelenen</span>
+                            <span class="kpi-value" id="kpi-reviewed-today">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">Manuel Düzeltilen</span>
+                            <span class="kpi-value" id="kpi-manually-corrected">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">AI Sonucu Onaylanan</span>
+                            <span class="kpi-value" id="kpi-ai-approved">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">Ürün Çelişkisi Bulunan</span>
+                            <span class="kpi-value" id="kpi-conflict-cnt" style="color: #EC4899;">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card glass">
+                        <div class="chart-header">
+                            <h3>Ürün Bazlı Şikayet Dağılımı</h3>
+                            <span class="info-badge">Fiber | Superbox | ADSL | Genel</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="productPieChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card glass">
+                        <div class="chart-header">
+                            <h3>Kök Neden & Alt Konu Dağılımı</h3>
+                            <span class="info-badge">Tüm Ürün Grupları</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="topicBarChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: PRODUCT DETAIL PAGE (DYNAMIC FOR FIBER, SUPERBOX, DSL) -->
+            <section id="tab-product-detail" class="tab-content">
+                <div class="product-detail-header glass" style="padding: 16px 24px; border-radius: 12px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.6);">
+                    <div>
+                        <h2 id="pd-title" style="margin: 0; font-size: 1.5rem; color: #FFF;">⚡ Fiber İnternet Analiz Detayı</h2>
+                        <p id="pd-subtitle" style="margin: 4px 0 0 0; font-size: 0.88rem; color: #94A3B8;">Gerçek verilerden üretilen ürün özelinde şikayet, trend ve AI doğruluk analizi (Legacy hariç)</p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" onclick="loadProductDetailData('Fiber')">Fiber</button>
+                        <button class="btn btn-outline" onclick="loadProductDetailData('Superbox')">Superbox</button>
+                        <button class="btn btn-outline" onclick="loadProductDetailData('DSL')">DSL</button>
+                    </div>
+                </div>
+
+                <!-- Product Summary KPI Cards -->
+                <div class="kpi-grid">
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">Toplam Şikâyet</span>
+                            <span class="kpi-value" id="pd-kpi-total">0</span>
+                            <span class="kpi-tag">Seçili Ürün</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">Bugün Gelen</span>
+                            <span class="kpi-value" id="pd-kpi-today">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">Son 7 Günlük</span>
+                            <span class="kpi-value" id="pd-kpi-week">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">Negatif Duygu Oranı</span>
+                            <span class="kpi-value" id="pd-kpi-neg-ratio" style="color: #F87171;">%0.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kpi-grid" style="margin-top: -12px;">
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">Kritik Aciliyet Sayısı</span>
+                            <span class="kpi-value" id="pd-kpi-crit">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">İnceleme Bekleyen</span>
+                            <span class="kpi-value" id="pd-kpi-pending">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">Ürün Çelişkisi</span>
+                            <span class="kpi-value" id="pd-kpi-conflict">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-body">
+                            <span class="kpi-label">AI Ürün Doğruluğu</span>
+                            <span class="kpi-value" id="pd-kpi-accuracy" style="color: #4ADE80;">%100</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Charts Grid -->
+                <div class="charts-grid">
+                    <div class="chart-card glass" style="grid-column: span 2;">
+                        <div class="chart-header">
+                            <h3>📈 Tarihsel Şikayet Trendi</h3>
+                            <span class="info-badge">Son 30 Günlük Değişim</span>
+                        </div>
+                        <div class="chart-container" style="height: 260px;">
+                            <canvas id="productTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-grid" style="margin-top: 20px;">
+                    <div class="chart-card glass">
+                        <div class="chart-header">
+                            <h3>Duygu Dağılımı</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="productSentimentChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card glass">
+                        <div class="chart-header">
+                            <h3>Aciliyet Dağılımı</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="productUrgencyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top 5 Issues List -->
+                <div class="table-card glass" style="margin-top: 24px;">
+                    <div class="table-header">
+                        <h3>🔥 Ürüne Özel En Çok Görülen 5 Sorun</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Sıra</th>
+                                    <th>Alt Kategori Sorunu</th>
+                                    <th>Şikayet Sayısı</th>
+                                    <th>Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pd-top5-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: PRODUCT COMPARISON MATRIX -->
+            <section id="tab-product-compare" class="tab-content">
+                <div class="table-card glass">
+                    <div class="table-header">
+                        <div>
+                            <h3>📊 Ürün Karşılaştırma Matrisi</h3>
+                            <p class="subtitle" style="margin:0;">Fiber, Superbox ve DSL ürünlerinin şikâyet, negatiflik ve AI performans analizi</p>
+                        </div>
+                    </div>
+                    <div class="table-responsive" style="margin-top: 16px;">
+                        <table class="data-table" style="width: 100%; text-align: center;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left;">Karşılaştırma Metriği</th>
+                                    <th>⚡ Fiber</th>
+                                    <th>📦 Superbox</th>
+                                    <th>🔌 DSL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="compare-tbody">
+                                <tr>
+                                    <td style="text-align: left;"><strong>Toplam Şikayet Adedi</strong></td>
+                                    <td id="cmp-fiber-total">0</td>
+                                    <td id="cmp-superbox-total">0</td>
+                                    <td id="cmp-dsl-total">0</td>
+                                </tr>
+                                <tr>
+                                    <td style="text-align: left;"><strong>Negatif Duygu Oranı (%)</strong></td>
+                                    <td id="cmp-fiber-neg">%0.0</td>
+                                    <td id="cmp-superbox-neg">%0.0</td>
+                                    <td id="cmp-dsl-neg">%0.0</td>
+                                </tr>
+                                <tr>
+                                    <td style="text-align: left;"><strong>Kritik Şikayet Sayısı</strong></td>
+                                    <td id="cmp-fiber-crit">0</td>
+                                    <td id="cmp-superbox-crit">0</td>
+                                    <td id="cmp-dsl-crit">0</td>
+                                </tr>
+                                <tr>
+                                    <td style="text-align: left;"><strong>Manuel İnceleme Bekleyen</strong></td>
+                                    <td id="cmp-fiber-pending">0</td>
+                                    <td id="cmp-superbox-pending">0</td>
+                                    <td id="cmp-dsl-pending">0</td>
+                                </tr>
+                                <tr>
+                                    <td style="text-align: left;"><strong>Ürün Çelişkisi Sayısı</strong></td>
+                                    <td id="cmp-fiber-conflict">0</td>
+                                    <td id="cmp-superbox-conflict">0</td>
+                                    <td id="cmp-dsl-conflict">0</td>
+                                </tr>
+                                <tr>
+                                    <td style="text-align: left;"><strong>AI Ürün Doğruluğu (%)</strong></td>
+                                    <td id="cmp-fiber-acc" style="color: #4ADE80; font-weight: 700;">%100</td>
+                                    <td id="cmp-superbox-acc" style="color: #4ADE80; font-weight: 700;">%100</td>
+                                    <td id="cmp-dsl-acc" style="color: #4ADE80; font-weight: 700;">%100</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: LIVE AI ANALYZER -->
+            <section id="tab-live-analyzer" class="tab-content">
+                <div class="analyzer-grid">
+                    <div class="analyzer-input-card glass">
+                        <div class="card-header">
+                            <h3>🤖 Canlı LLM / AI Bağlam Analizi</h3>
+                            <p>Kullanıcı herhangi bir yorum yazdığında sistem kelime eşleşmesi yerine <strong>LLM bağlam analizi</strong> ile ürünü ve çoklu ürün ilişkisini otomatik tespit eder.</p>
+                        </div>
+
+                        <div class="preset-buttons">
+                            <span class="preset-label">Test Senaryosu Seç:</span>
+                            <button class="btn-chip" onclick="setPreset('fiber')">Case A: Fiber ("LOS Işığı")</button>
+                            <button class="btn-chip" onclick="setPreset('superbox')">Case B: Superbox ("4.5G Çekim")</button>
+                            <button class="btn-chip" onclick="setPreset('dsl')">Case C: DSL ("Bakır Hat")</button>
+                            <button class="btn-chip" onclick="setPreset('other')">Case E: Genel ("Fatura Yüksek")</button>
+                            <button class="btn-chip highlight" onclick="setPreset('multi')">🔥 Case D: Çoklu Ürün ("Fiber + Superbox")</button>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="review-input">Müşteri Yorumu / Şikayet Metni:</label>
+                            <textarea id="review-input" rows="5" placeholder="Örn: İnternetim sürekli kopuyor, modemde LOS ışığı yanıyor..."></textarea>
+                        </div>
+
+                        <button class="btn btn-accent full-width" onclick="analyzeText()">
+                            🚀 AI Analiz Çalıştır (Phase 2.1 Inference)
+                        </button>
+                    </div>
+
+                    <div class="analyzer-result-card glass" id="result-box">
+                        <div class="card-header">
+                            <h3>📄 AI JSON Çıktısı & Analiz Sonuçları</h3>
+                            <span class="confidence-badge" id="result-confidence">0.95 Güven</span>
+                        </div>
+
+                        <div class="result-placeholder" id="result-placeholder">
+                            <div class="placeholder-icon">🤖</div>
+                            <p>Sol taraftaki kutudan bir yorum yazıp veya örnek butonlara tıklayıp <strong>"AI Analiz Çalıştır"</strong> butonuna basın.</p>
+                        </div>
+
+                        <div class="result-details hidden" id="result-details">
+                            <div class="main-result-box">
+                                <div class="result-row-flex">
+                                    <div>
+                                        <span class="res-label">Ana Ürün (primaryProduct):</span>
+                                        <div class="product-badges-container" id="res-products-list"></div>
+                                    </div>
+                                    <div id="res-review-badge"></div>
+                                </div>
+
+                                <div class="metadata-grid-cards">
+                                    <div class="meta-card">
+                                        <span class="meta-title">Ana Kategori</span>
+                                        <span class="meta-val" id="res-main-cat">Bağlantı ve Erişim</span>
+                                    </div>
+                                    <div class="meta-card">
+                                        <span class="meta-title">Alt Kategori</span>
+                                        <span class="meta-val" id="res-sub-cat">LOS Işığı / Optik Sinyal Kesintisi</span>
+                                    </div>
+                                    <div class="meta-card">
+                                        <span class="meta-title">Duygu & Türü</span>
+                                        <span class="meta-val" id="res-sentiment-emotion">🔴 Negative (Hayal Kırıklığı)</span>
+                                    </div>
+                                    <div class="meta-card">
+                                        <span class="meta-title">Aciliyet Seviyesi</span>
+                                        <span class="meta-val" id="res-urgency">⚡ High</span>
+                                    </div>
+                                </div>
+
+                                <div class="evidence-box">
+                                    <span class="json-title">🔍 Tespit Gerekçesi (Evidence):</span>
+                                    <ul id="res-evidence-list" class="evidence-ul"></ul>
+                                </div>
+                            </div>
+
+                            <div class="json-output-box">
+                                <span class="json-title">JSON API Yanıt Formatı:</span>
+                                <pre class="code-block" id="json-output-pre"><code>{}</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: MANUEL İNCELEME KUYRUĞU -->
+            <section id="tab-review-queue" class="tab-content">
+                <div class="table-card glass">
+                    <div class="table-header" style="flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h3>⚠️ Manuel İnceleme Kuyruğu</h3>
+                            <p class="subtitle" style="margin:0;">Düşük güvenli, ürün çelişkili veya onay bekleyen şikayet kontrol ve düzeltme paneli</p>
+                        </div>
+                        <div class="preset-buttons" style="margin:0;">
+                            <button class="btn-chip" onclick="filterReviewQueuePreset('LOW_CONFIDENCE')">Düşük Güven</button>
+                            <button class="btn-chip highlight" onclick="filterReviewQueuePreset('PRODUCT_CONFLICT')">⚠️ Ürün Çelişkisi</button>
+                            <button class="btn-chip" onclick="filterReviewQueuePreset('UNDETERMINED')">Belirlenemedi</button>
+                            <button class="btn-chip" onclick="filterReviewQueuePreset('MULTI_PRODUCT')">🔥 Çoklu Ürün</button>
+                            <button class="btn-chip" onclick="filterReviewQueuePreset('CRITICAL')">⚡ Kritik</button>
+                            <button class="btn-chip" onclick="filterReviewQueuePreset('TODAY')">📅 Bugün</button>
+                            <button class="btn-chip" onclick="loadReviewQueueData()">Tümünü Göster</button>
+                        </div>
+                    </div>
+
+                    <div class="table-filters" style="margin: 16px 0; display: flex; gap: 12px; flex-wrap: wrap;">
+                        <input type="text" id="rq-search" placeholder="ID veya metin ara..." oninput="filterReviewQueue()" style="padding: 8px 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; border-radius: 6px; flex: 1; min-width: 180px;">
+                        <select id="rq-prod" onchange="filterReviewQueue()">
+                            <option value="ALL">Tüm Ürünler</option>
+                            <option value="Fiber">Fiber</option>
+                            <option value="Superbox">Superbox</option>
+                            <option value="DSL">DSL</option>
+                            <option value="Ürün Bağımsız Genel Şikâyet">Ürün Bağımsız Genel</option>
+                            <option value="Belirlenemedi">Belirlenemedi</option>
+                        </select>
+                        <select id="rq-urgency" onchange="filterReviewQueue()">
+                            <option value="ALL">Tüm Aciliyetler</option>
+                            <option value="High">High / Critical</option>
+                            <option value="Medium">Medium</option>
+                            <option value="Low">Low</option>
+                        </select>
+                        <select id="rq-sentiment" onchange="filterReviewQueue()">
+                            <option value="ALL">Tüm Duygular</option>
+                            <option value="Negative">Negative</option>
+                            <option value="Neutral">Neutral</option>
+                            <option value="Positive">Positive</option>
+                        </select>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Kaynak</th>
+                                    <th>Kaynak Ürün</th>
+                                    <th>AI Ürün Sonucu</th>
+                                    <th>Şikayet Metni (KVKK Maskeli)</th>
+                                    <th>Ana / Alt Kategori</th>
+                                    <th>Duygu</th>
+                                    <th>Aciliyet</th>
+                                    <th>Güven</th>
+                                    <th>Çelişki</th>
+                                    <th>Durum</th>
+                                    <th>Tarih</th>
+                                    <th>İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rq-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: COMPLAINTS DATABASE WITH DATE FILTERS -->
+            <section id="tab-complaints-db" class="tab-content">
+                <div class="table-card glass">
+                    <div class="table-header">
+                        <h3>🗄️ SQL Veritabanı Şikayet Kayıtları</h3>
+                        <div class="table-filters">
+                            <select id="filter-product" onchange="filterComplaintsTable()">
+                                <option value="ALL" selected>Tüm Ürünler (Fiber, Superbox, DSL, Genel)</option>
+                                <option value="Fiber">Fiber</option>
+                                <option value="Superbox">Superbox</option>
+                                <option value="DSL">DSL</option>
+                                <option value="Ürün Bağımsız Genel Şikâyet">Ürün Bağımsız Genel Şikâyet</option>
+                                <option value="Belirlenemedi">Belirlenemedi</option>
+                            </select>
+
+                            <select id="filter-date" onchange="filterComplaintsTable()">
+                                <option value="ALL" selected>📅 Tüm Zamanlar</option>
+                                <option value="TODAY">📅 Bugün</option>
+                                <option value="WEEK">📅 Son 7 Gün (Bu Hafta)</option>
+                                <option value="MONTH">📅 Son 30 Gün (Bu Ay)</option>
+                            </select>
+
+                            <select id="sort-date" onchange="filterComplaintsTable()">
+                                <option value="DESC" selected>⬇️ Yeniden Eskiden (En Yeni)</option>
+                                <option value="ASC">⬆️ Eskiden Yeniye (En Eski)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                    <th>ID</th>
+                                    <th>Karar Kaynağı</th>
+                                    <th>Kaynak / Nihai Ürün</th>
+                                    <th>Müşteri Metni (KVKK Maskeli)</th>
+                                    <th>Ana / Alt Kategori</th>
+                                    <th>Aciliyet</th>
+                                    <th>Güven</th>
+                                    <th>Tarih & Saat</th>
+                                </tr>
+                            </thead>
+                            <tbody id="complaints-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: SCRAPE RUN DETAILS -->
+            <section id="tab-scrape-runs" class="tab-content">
+                <div class="header-banner glass" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                    <div>
+                        <h2>📡 Veri Çekme Oturumu Detayları</h2>
+                        <p style="color: #94A3B8; font-size: 0.95rem; margin-top: 4px;">Run ID: <span id="run-header-id" style="font-family: var(--font-mono); color: #38BDF8; font-weight: bold;">-</span></p>
+                    </div>
+                    <div style="text-align: right;">
+                        <span id="run-status-badge" class="badge-sent" style="font-size: 1rem; padding: 6px 14px;">DURUM: -</span>
+                        <div style="font-size: 0.8rem; color: #94A3B8; margin-top: 6px;" id="run-meta-info">Strateji: - | Başlangıç: - | Süre: 0s</div>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card glass highlight-blue">
+                        <div class="kpi-icon">📊</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Toplam Taranan Sayfa</span>
+                            <span class="kpi-value" id="run-pages-scanned">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass highlight-green">
+                        <div class="kpi-icon">🔍</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Benzersiz URL (Run)</span>
+                            <span class="kpi-value" id="run-unique-urls">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass highlight-yellow">
+                        <div class="kpi-icon">📥</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Veritabanına Eklenen</span>
+                            <span class="kpi-value" id="run-inserted">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass highlight-red">
+                        <div class="kpi-icon">⚠️</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Eski/DB Duplicate</span>
+                            <span class="kpi-value" id="run-duplicates">0</span>
+                        </div>
+                    </div>
+                    <div class="kpi-card glass highlight-purple">
+                        <div class="kpi-icon">❌</div>
+                        <div class="kpi-body">
+                            <span class="kpi-label">Hatalı / Failed</span>
+                            <span class="kpi-value" id="run-failed">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card glass" style="margin-top: 24px;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <h3>Run URL Detayları</h3>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <label style="font-size: 0.85rem; color: #94A3B8;">Nihai Ürün Filtrele:</label>
+                            <select id="filter-run-product" style="padding: 6px 12px; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.1); color: #FFF; border-radius: 6px; font-size: 0.85rem;" onchange="filterRunItemsTable()">
+                                <option value="ALL">Tüm Ürünler</option>
+                                <option value="Fiber">Fiber</option>
+                                <option value="Superbox">Superbox</option>
+                                <option value="DSL">DSL</option>
+                                <option value="Ürün Bağımsız Genel Şikâyet">Ürün Bağımsız Genel Şikâyet</option>
+                                <option value="Çoklu Ürün">Çoklu Ürün</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table" id="run-items-table">
+                            <thead>
+                                <tr>
+                                    <th>Kaynak Ürün</th>
+                                    <th>Sayfa</th>
+                                    <th>URL / Başlık</th>
+                                    <th>Nihai Ürün</th>
+                                    <th>Güven</th>
+                                    <th>Durum</th>
+                                    <th>Duplicate Nedeni</th>
+                                    <th>Tarih</th>
+                                </tr>
+                            </thead>
+                            <tbody id="run-items-tbody">
+                                <tr><td colspan="8" style="text-align:center;">Kayıt bulunamadı.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- DETAIL & EDIT MODAL FOR REVIEW QUEUE -->
+    <div id="modal-review-detail" class="modal-backdrop hidden">
+        <div class="modal-box glass" style="max-width: 680px;">
+            <div class="modal-header">
+                <h3 id="md-title">✏️ İnceleme ve Düzeltme Modalı</h3>
+                <button class="btn-close" onclick="closeReviewDetailModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="main-result-box" style="margin-bottom: 16px;">
+                    <span class="res-label">Müşteri Metni (KVKK Maskeli):</span>
+                    <p id="md-masked-text" style="font-size: 0.95rem; line-height: 1.5; color: #F1F5F9; margin-top: 6px;"></p>
+                </div>
+
+                <div id="md-comparison-box" class="hidden" style="background: rgba(16, 185, 129, 0.1); border: 1px solid #10B981; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                    <h4 style="color: #34D399; margin: 0 0 6px 0;">🔄 Yeniden AI Analiz Karşılaştırması</h4>
+                    <div id="md-comparison-content" style="font-size: 0.85rem;"></div>
+                </div>
+
+                <form id="form-review-edit" onsubmit="event.preventDefault();">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div class="form-group">
+                            <label>Ana Ürün (primaryProduct):</label>
+                            <select id="edit-primary-product" style="width:100%; padding:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:6px;">
+                                <option value="Fiber">Fiber</option>
+                                <option value="Superbox">Superbox</option>
+                                <option value="DSL">DSL</option>
+                                <option value="Çoklu Ürün">Çoklu Ürün</option>
+                                <option value="Ürün Bağımsız Genel Şikâyet">Ürün Bağımsız Genel Şikâyet</option>
+                                <option value="Belirlenemedi">Belirlenemedi</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Ana Kategori:</label>
+                            <select id="edit-main-cat" style="width:100%; padding:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:6px;">
+                                <option value="Bağlantı ve Erişim">Bağlantı ve Erişim</option>
+                                <option value="Hız ve Performans">Hız ve Performans</option>
+                                <option value="Kurulum ve Aktivasyon">Kurulum ve Aktivasyon</option>
+                                <option value="Altyapı ve Port">Altyapı ve Port</option>
+                                <option value="Cihaz ve Modem">Cihaz ve Modem</option>
+                                <option value="Fatura ve Ücretlendirme">Fatura ve Ücretlendirme</option>
+                                <option value="Taahhüt ve Kampanya">Taahhüt ve Kampanya</option>
+                                <option value="İptal ve Taşıma">İptal ve Taşıma</option>
+                                <option value="Müşteri Hizmetleri">Müşteri Hizmetleri</option>
+                                <option value="Teknik Servis">Teknik Servis</option>
+                                <option value="Genel Talep">Genel Talep</option>
+                                <option value="Diğer">Diğer</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Alt Kategori:</label>
+                            <input type="text" id="edit-sub-cat" style="width:100%; padding:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:6px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Duygu (Sentiment):</label>
+                            <select id="edit-sentiment" style="width:100%; padding:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:6px;">
+                                <option value="Negative">Negative</option>
+                                <option value="Neutral">Neutral</option>
+                                <option value="Positive">Positive</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Duygu Türü (Emotion):</label>
+                            <input type="text" id="edit-emotion" style="width:100%; padding:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:6px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Aciliyet (Urgency):</label>
+                            <select id="edit-urgency" style="width:100%; padding:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:6px;">
+                                <option value="Critical">Critical</option>
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 12px;">
+                        <label>Uzman İnceleme Notu:</label>
+                        <textarea id="edit-note" rows="2" placeholder="İnceleme notunu buraya yazın..." style="width:100%; padding:8px; background:rgba(15,23,42,0.8); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:6px;"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 16px;">
+                <button class="btn btn-outline" style="border-color: #EF4444; color: #F87171;" onclick="submitDeleteReview()">🗑️ Sil</button>
+                <button class="btn btn-outline" onclick="submitDeferReview()">⏸️ Ertele</button>
+                <button class="btn btn-outline" onclick="submitReanalyzeReview()">🔄 Yeniden Analiz Et</button>
+                <button class="btn btn-outline" onclick="submitApproveAiReview()">✅ AI Sonucunu Onayla</button>
+                <button class="btn btn-primary" onclick="submitEditReview()">✏️ Düzenleyip Onayla</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js?v=20260723-nocache-v2"></script>
+</body>
+</html>

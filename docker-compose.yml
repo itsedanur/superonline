@@ -1,0 +1,31 @@
+services:
+  superonline_analytics:
+    build: .
+    container_name: superonline_enterprise_app
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_TYPE=sqlite
+      - PORT=8080
+      - ENVIRONMENT=production
+      - ENABLE_PUBLIC_WEB_PROTOTYPE=true
+    volumes:
+      - ./data:/app/data
+    restart: always
+
+  # Opsiyonel PostgreSQL Veritabanı Servisi
+  db:
+    image: postgres:15-alpine
+    container_name: superonline_postgres_db
+    environment:
+      POSTGRES_DB: superonline_analytics
+      POSTGRES_USER: turkcell_admin
+      POSTGRES_PASSWORD: superonline_secret_pass
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
