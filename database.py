@@ -901,6 +901,45 @@ class EnterpriseDatabase:
                 "topic_counts": topic_counts
             }
 
+    def calculate_period_change(self, current, previous):
+        current = current or 0
+        previous = previous or 0
+        if previous == 0 and current == 0:
+            return {
+                "current_count": 0,
+                "previous_count": 0,
+                "change_pct": 0.0,
+                "change_status": "NO_CHANGE",
+                "message": "Dönemler arasında değişim kaydedilmedi (0 kayıt)."
+            }
+        elif previous == 0 and current > 0:
+            return {
+                "current_count": current,
+                "previous_count": 0,
+                "change_pct": None,
+                "change_status": "NEW_ACTIVITY",
+                "message": "Yeni aktivite — önceki dönemde karşılaştırma verisi yok."
+            }
+        else:
+            pct = round(((current - previous) / previous) * 100, 1)
+            if current > previous:
+                status = "INCREASE"
+                msg = f"Önceki döneme göre %{pct} artış."
+            elif current < previous:
+                status = "DECREASE"
+                msg = f"Önceki döneme göre %{abs(pct)} azalış."
+            else:
+                status = "NO_CHANGE"
+                msg = "Önceki dönem ile aynı düzeyde."
+                
+            return {
+                "current_count": current,
+                "previous_count": previous,
+                "change_pct": pct,
+                "change_status": status,
+                "message": msg
+            }
+
     def get_executive_summary(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -916,37 +955,60 @@ class EnterpriseDatabase:
             cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE review_status != 'DELETED'")
             total = cursor.fetchone()["cnt"]
 
-            # Today vs Yesterday
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(created_at, 1, 10) = ?", (today_str,))
+            # 1. Daily comparison (Today vs Yesterday)
+            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) = ? AND review_status != 'DELETED'", (today_str,))
             today_cnt = cursor.fetchone()["cnt"]
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(created_at, 1, 10) = ?", (yesterday_str,))
+            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) = ? AND review_status != 'DELETED'", (yesterday_str,))
             yest_cnt = cursor.fetchone()["cnt"]
-            daily_change_pct = round(((today_cnt - yest_cnt) / yest_cnt * 100), 1) if yest_cnt > 0 else (100.0 if today_cnt > 0 else 0.0)
+            
+            daily_metrics = self.calculate_period_change(today_cnt, yest_cnt)
+            daily_metrics.update({
+                "period_start": today_str,
+                "period_end": today_str,
+                "comparison_start": yesterday_str,
+                "comparison_end": yesterday_str
+            })
 
-            # Last 7d vs Prev 7d
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(created_at, 1, 10) >= ?", (d7_str,))
+            # 2. Weekly comparison (Last 7d vs Prev 7d)
+            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? AND review_status != 'DELETED'", (d7_str,))
             w1_cnt = cursor.fetchone()["cnt"]
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(created_at, 1, 10) >= ? AND SUBSTR(created_at, 1, 10) < ?", (d14_str, d7_str))
+            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? AND SUBSTR(COALESCE(source_published_at, created_at), 1, 10) < ? AND review_status != 'DELETED'", (d14_str, d7_str))
             w2_cnt = cursor.fetchone()["cnt"]
-            weekly_change_pct = round(((w1_cnt - w2_cnt) / w2_cnt * 100), 1) if w2_cnt > 0 else (100.0 if w1_cnt > 0 else 0.0)
 
-            # Last 30d vs Prev 30d
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(created_at, 1, 10) >= ?", (d30_str,))
+            weekly_metrics = self.calculate_period_change(w1_cnt, w2_cnt)
+            weekly_metrics.update({
+                "period_start": d7_str,
+                "period_end": today_str,
+                "comparison_start": d14_str,
+                "comparison_end": d7_str
+            })
+
+            # 3. Monthly comparison (Last 30d vs Prev 30d)
+            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? AND review_status != 'DELETED'", (d30_str,))
             m1_cnt = cursor.fetchone()["cnt"]
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(created_at, 1, 10) >= ? AND SUBSTR(created_at, 1, 10) < ?", (d60_str, d30_str))
+            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? AND SUBSTR(COALESCE(source_published_at, created_at), 1, 10) < ? AND review_status != 'DELETED'", (d60_str, d30_str))
             m2_cnt = cursor.fetchone()["cnt"]
-            monthly_change_pct = round(((m1_cnt - m2_cnt) / m2_cnt * 100), 1) if m2_cnt > 0 else (100.0 if m1_cnt > 0 else 0.0)
+
+            monthly_metrics = self.calculate_period_change(m1_cnt, m2_cnt)
+            monthly_metrics.update({
+                "period_start": d30_str,
+                "period_end": today_str,
+                "comparison_start": d60_str,
+                "comparison_end": d30_str
+            })
 
             # Critical complaints ratio
             cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE urgency IN ('High', 'Critical') AND review_status != 'DELETED'")
             crit_cnt = cursor.fetchone()["cnt"]
             crit_ratio_pct = round((crit_cnt / total * 100), 1) if total > 0 else 0.0
 
-            # Product Breakdown & Problematic Product
+            # Product Breakdown & Multi-metric Problematic Highlight
             products = ["Fiber", "Superbox", "ADSL"]
             prod_metrics = {}
-            max_crit = -1
-            most_prob_prod = "Fiber"
+
+            top_vol_prod = ("Fiber", 0)
+            top_crit_prod = ("Fiber", 0.0)
+            top_neg_prod = ("Fiber", 0.0)
 
             for p in products:
                 cursor.execute("""
@@ -961,25 +1023,43 @@ class EnterpriseDatabase:
                 crit_p = r["crit_cnt"] or 0
                 neg_p = r["neg_cnt"] or 0
 
+                crit_ratio = round((crit_p / tot_p * 100), 1) if tot_p > 0 else 0.0
+                neg_ratio = round((neg_p / tot_p * 100), 1) if tot_p > 0 else 0.0
+
                 prod_metrics[p] = {
                     "total": tot_p,
                     "critical_count": crit_p,
                     "negative_count": neg_p,
-                    "critical_ratio": round((crit_p / tot_p * 100), 1) if tot_p > 0 else 0.0
+                    "critical_ratio": crit_ratio,
+                    "negative_ratio": neg_ratio
                 }
-                if crit_p > max_crit:
-                    max_crit = crit_p
-                    most_prob_prod = p
 
-            # Fastest Rising Categories (Sub-categories)
+                if tot_p > top_vol_prod[1]:
+                    top_vol_prod = (p, tot_p)
+                if crit_ratio > top_crit_prod[1]:
+                    top_crit_prod = (p, crit_ratio)
+                if neg_ratio > top_neg_prod[1]:
+                    top_neg_prod = (p, neg_ratio)
+
+            # Determine problematic product highlight with multi-dimensional rationale
+            most_prob_prod_name = top_crit_prod[0] if top_crit_prod[1] > 0 else top_vol_prod[0]
+            most_prob_summary = {
+                "product": most_prob_prod_name,
+                "highest_volume_product": top_vol_prod[0],
+                "highest_critical_ratio_product": top_crit_prod[0],
+                "highest_negative_ratio_product": top_neg_prod[0],
+                "highlight_reason": f"{most_prob_prod_name} (Kritik Şikâyet Oranı: %{top_crit_prod[1]})"
+            }
+
+            # 4. Fastest Rising Categories (Minimum sample threshold: recent_cnt + prev_cnt >= 5)
             cursor.execute("""
                 SELECT sub_category,
-                       SUM(CASE WHEN SUBSTR(created_at, 1, 10) >= ? THEN 1 ELSE 0 END) as recent_cnt,
-                       SUM(CASE WHEN SUBSTR(created_at, 1, 10) >= ? AND SUBSTR(created_at, 1, 10) < ? THEN 1 ELSE 0 END) as prev_cnt
+                       SUM(CASE WHEN SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? THEN 1 ELSE 0 END) as recent_cnt,
+                       SUM(CASE WHEN SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? AND SUBSTR(COALESCE(source_published_at, created_at), 1, 10) < ? THEN 1 ELSE 0 END) as prev_cnt
                 FROM complaints
                 WHERE review_status != 'DELETED' AND sub_category IS NOT NULL
                 GROUP BY sub_category
-                HAVING recent_cnt > 0
+                HAVING (recent_cnt + prev_cnt) >= 5 AND recent_cnt > 0
                 ORDER BY (recent_cnt - prev_cnt) DESC
                 LIMIT 5
             """, (d7_str, d14_str, d7_str))
@@ -990,25 +1070,32 @@ class EnterpriseDatabase:
                 sc = r["sub_category"]
                 rc = r["recent_cnt"]
                 pc = r["prev_cnt"]
-                growth = round(((rc - pc) / pc * 100), 1) if pc > 0 else 100.0
+                cat_change = self.calculate_period_change(rc, pc)
                 fastest_rising.append({
                     "sub_category": sc,
                     "recent_7d": rc,
                     "prev_7d": pc,
-                    "growth_pct": growth
+                    "growth_pct": cat_change["change_pct"],
+                    "change_status": cat_change["change_status"],
+                    "message": cat_change["message"],
+                    "minimum_sample_met": True
                 })
 
             return {
                 "total_complaints": total,
                 "today_complaints": today_cnt,
-                "daily_change_pct": daily_change_pct,
+                "daily_change_pct": daily_metrics["change_pct"],
+                "daily_metrics": daily_metrics,
                 "this_week_complaints": w1_cnt,
-                "weekly_change_pct": weekly_change_pct,
+                "weekly_change_pct": weekly_metrics["change_pct"],
+                "weekly_metrics": weekly_metrics,
                 "this_month_complaints": m1_cnt,
-                "monthly_change_pct": monthly_change_pct,
+                "monthly_change_pct": monthly_metrics["change_pct"],
+                "monthly_metrics": monthly_metrics,
                 "critical_complaints_count": crit_cnt,
                 "critical_ratio_pct": crit_ratio_pct,
-                "most_problematic_product": most_prob_prod,
+                "most_problematic_product": most_prob_prod_name,
+                "most_problematic_summary": most_prob_summary,
                 "product_metrics": prod_metrics,
                 "fastest_rising_categories": fastest_rising
             }
@@ -1016,11 +1103,13 @@ class EnterpriseDatabase:
     def get_executive_trends(self, days=30):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+            now = datetime.now()
+            start_date = (now - timedelta(days=days)).strftime("%Y-%m-%d")
+            end_date = now.strftime("%Y-%m-%d")
             
             cursor.execute("""
                 SELECT 
-                    SUBSTR(created_at, 1, 10) as day,
+                    SUBSTR(COALESCE(source_published_at, created_at), 1, 10) as day,
                     SUM(CASE WHEN COALESCE(final_product, primary_product) = 'Fiber' THEN 1 ELSE 0 END) as fiber_cnt,
                     SUM(CASE WHEN COALESCE(final_product, primary_product) = 'Superbox' THEN 1 ELSE 0 END) as superbox_cnt,
                     SUM(CASE WHEN COALESCE(final_product, primary_product) = 'ADSL' THEN 1 ELSE 0 END) as adsl_cnt,
@@ -1030,13 +1119,29 @@ class EnterpriseDatabase:
                     SUM(CASE WHEN urgency IN ('High', 'Critical') THEN 1 ELSE 0 END) as critical_cnt,
                     COUNT(*) as total
                 FROM complaints
-                WHERE review_status != 'DELETED' AND created_at >= ?
-                GROUP BY SUBSTR(created_at, 1, 10)
+                WHERE review_status != 'DELETED' AND SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ?
+                GROUP BY SUBSTR(COALESCE(source_published_at, created_at), 1, 10)
                 ORDER BY day ASC
-            """, (f"{start_date} 00:00:00",))
+            """, (start_date,))
             
             rows = cursor.fetchall()
-            return [dict(r) for r in rows]
+            series = [dict(r) for r in rows]
+            days_with_data = len(series)
+
+            is_sparse = days_with_data < 5
+            warning_msg = f"Son {days} günlük dönemde yalnızca {days_with_data} gün veri bulunmaktadır." if is_sparse else None
+
+            return {
+                "series": series,
+                "coverage_metadata": {
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "days_with_data_count": days_with_data,
+                    "total_timepoints_count": days,
+                    "is_sparse": is_sparse,
+                    "warning_message": warning_msg
+                }
+            }
 
     def get_latest_source_published_date(self):
         with self.get_connection() as conn:

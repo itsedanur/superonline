@@ -173,6 +173,12 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
             trends = db.get_executive_trends(days=days)
             self.send_json_response(trends)
 
+        # GET /api/v1/executive/insights
+        elif path in ["/api/executive/insights", "/api/v1/executive/insights"]:
+            exec_summary = db.get_executive_summary()
+            insights = ai_engine.generate_executive_insights(exec_summary)
+            self.send_json_response(insights)
+
         # GET /api/v1/stats
         elif path in ["/api/stats", "/api/v1/stats"]:
             db_stats = db.get_stats()

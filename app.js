@@ -1126,6 +1126,8 @@ function filterRunItemsTable() {
 // EXECUTIVE DASHBOARD & AI INSIGHT ENGINE
 let execTrendChartInstance = null;
 let execRisingChartInstance = null;
+let execVolumeChartInstance = null;
+let execDistChartInstance = null;
 
 async function loadExecutiveDashboardData() {
     try {
@@ -1135,40 +1137,75 @@ async function loadExecutiveDashboardData() {
         ]);
 
         if (!sumRes.ok || !trendRes.ok) {
-            console.error("Executive API request failed");
+            console.error("Executive API request failed", sumRes.status, trendRes.status);
             return;
         }
 
         const summary = await sumRes.json();
-        const trendData = await trendRes.json();
+        const trendResponse = await trendRes.json();
+        const trendData = Array.isArray(trendResponse) ? trendResponse : (trendResponse.series || []);
+        const meta = trendResponse.coverage_metadata || {};
 
-        // Populate KPIs
-        if (document.getElementById("exec-daily-cnt")) document.getElementById("exec-daily-cnt").innerText = (summary.daily_complaint_count || 0).toLocaleString('tr-TR');
-        if (document.getElementById("exec-daily-pct")) {
-            const pct = summary.daily_change_pct || 0;
-            document.getElementById("exec-daily-pct").innerText = `${pct >= 0 ? '+' : ''}${pct}% Günlük`;
-            document.getElementById("exec-daily-pct").style.color = pct > 0 ? '#F87171' : '#4ADE80';
+        console.log("EXEC_SUMMARY_RAW:", summary);
+        console.log("EXEC_TRENDS_RAW:", trendResponse);
+
+        // Helper to populate KPI cards with period boundaries & zero-base status
+        function renderKPICard(cntId, pctId, msgId, metric) {
+            if (!metric) return;
+            const cntEl = document.getElementById(cntId);
+            const pctEl = document.getElementById(pctId);
+            const msgEl = document.getElementById(msgId);
+
+            if (cntEl) cntEl.innerText = (metric.current_count || 0).toLocaleString('tr-TR');
+            
+            if (pctEl) {
+                if (metric.change_status === "NEW_ACTIVITY") {
+                    pctEl.innerText = "Yeni Aktivite";
+                    pctEl.style.color = "#38BDF8";
+                } else if (metric.change_pct !== null && metric.change_pct !== undefined) {
+                    const pct = metric.change_pct;
+                    pctEl.innerText = `${pct >= 0 ? '+' : ''}${pct}%`;
+                    pctEl.style.color = pct > 0 ? '#F87171' : (pct < 0 ? '#4ADE80' : '#94A3B8');
+                } else {
+                    pctEl.innerText = "Değişim Yok";
+                    pctEl.style.color = "#94A3B8";
+                }
+            }
+
+            if (msgEl) {
+                msgEl.innerText = metric.message || `${metric.period_start || ''} ~ ${metric.period_end || ''}`;
+            }
         }
 
-        if (document.getElementById("exec-weekly-cnt")) document.getElementById("exec-weekly-cnt").innerText = (summary.weekly_complaint_count || 0).toLocaleString('tr-TR');
-        if (document.getElementById("exec-weekly-pct")) {
-            const pct = summary.weekly_change_pct || 0;
-            document.getElementById("exec-weekly-pct").innerText = `${pct >= 0 ? '+' : ''}${pct}% Haftalık`;
-            document.getElementById("exec-weekly-pct").style.color = pct > 0 ? '#F87171' : '#4ADE80';
-        }
-
-        if (document.getElementById("exec-monthly-cnt")) document.getElementById("exec-monthly-cnt").innerText = (summary.monthly_complaint_count || 0).toLocaleString('tr-TR');
-        if (document.getElementById("exec-monthly-pct")) {
-            const pct = summary.monthly_change_pct || 0;
-            document.getElementById("exec-monthly-pct").innerText = `${pct >= 0 ? '+' : ''}${pct}% Aylık`;
-            document.getElementById("exec-monthly-pct").style.color = pct > 0 ? '#F87171' : '#4ADE80';
-        }
+        renderKPICard("exec-daily-cnt", "exec-daily-pct", "exec-daily-msg", summary.daily_metrics || { current_count: summary.today_complaints, change_pct: summary.daily_change_pct });
+        renderKPICard("exec-weekly-cnt", "exec-weekly-pct", "exec-weekly-msg", summary.weekly_metrics || { current_count: summary.this_week_complaints, change_pct: summary.weekly_change_pct });
+        renderKPICard("exec-monthly-cnt", "exec-monthly-pct", "exec-monthly-msg", summary.monthly_metrics || { current_count: summary.this_month_complaints, change_pct: summary.monthly_change_pct });
 
         if (document.getElementById("exec-crit-ratio")) document.getElementById("exec-crit-ratio").innerText = `%${summary.critical_ratio_pct || 0}`;
-        if (document.getElementById("exec-crit-cnt")) document.getElementById("exec-crit-cnt").innerText = `${summary.critical_complaint_count || 0} Kritik Şikâyet`;
+        if (document.getElementById("exec-crit-cnt")) document.getElementById("exec-crit-cnt").innerText = `${summary.critical_complaints_count ?? summary.critical_complaint_count ?? 0} Kritik Şikâyet`;
 
         if (document.getElementById("exec-most-problematic")) {
             document.getElementById("exec-most-problematic").innerText = summary.most_problematic_product || "Yok";
+        }
+        if (document.getElementById("exec-most-prob-tag")) {
+            const probSum = summary.most_problematic_summary;
+            if (probSum && probSum.highlight_reason) {
+                document.getElementById("exec-most-prob-tag").innerText = probSum.highlight_reason;
+            } else {
+                document.getElementById("exec-most-prob-tag").innerText = "Aksiyon Gerekli";
+            }
+        }
+
+        // Handle Trend Sparsity Banner
+        const sparsityBanner = document.getElementById("exec-sparsity-banner");
+        const trendBadge = document.getElementById("exec-trend-badge");
+        if (meta.is_sparse && meta.warning_message) {
+            if (sparsityBanner) sparsityBanner.innerText = `⚠️ ${meta.warning_message}`;
+        } else {
+            if (sparsityBanner) sparsityBanner.innerText = "";
+        }
+        if (trendBadge) {
+            trendBadge.innerText = meta.days_with_data_count ? `Veri: ${meta.days_with_data_count} gün / ${meta.total_timepoints_count} gün` : "Son 30 Günlük Zaman Serisi";
         }
 
         // Render AI Insights Panel
@@ -1190,30 +1227,33 @@ async function loadExecutiveDashboardData() {
 
                 return `
                     <div style="padding: 14px; background: ${bgCol}; border-left: 4px solid ${borderCol}; border-radius: 8px;">
-                        <div style="font-weight: 700; font-size: 0.95rem; color: #F8FAFC; margin-bottom: 6px;">${item.title}</div>
-                        <div style="font-size: 0.85rem; color: #CBD5E1; line-height: 1.4;">${item.message}</div>
+                        <div style="font-weight: 700; font-size: 0.95rem; color: #F8FAFC; margin-bottom: 6px;">${item.icon || ''} ${item.title}</div>
+                        <div style="font-size: 0.85rem; color: #CBD5E1; line-height: 1.4;">${item.body || item.message || ''}</div>
                     </div>
                 `;
             }).join("");
         }
 
-        // Render Product Trend Line Chart
+        // 1. CHART: Product Trend Line Chart (Fiber vs Superbox vs ADSL)
         if (execTrendChartInstance) execTrendChartInstance.destroy();
         const ctxTrend = document.getElementById("execProductTrendChart");
         if (ctxTrend && Array.isArray(trendData)) {
-            const labels = trendData.map(d => d.date);
-            const fiberData = trendData.map(d => d.Fiber || 0);
-            const superboxData = trendData.map(d => d.Superbox || 0);
-            const adslData = trendData.map(d => d.ADSL || 0);
+            const labels = trendData.map(d => d.day || d.date || "Tarih Yok");
+            const fiberData = trendData.map(d => d.fiber_cnt ?? d.Fiber ?? 0);
+            const superboxData = trendData.map(d => d.superbox_cnt ?? d.Superbox ?? 0);
+            const adslData = trendData.map(d => d.adsl_cnt ?? d.ADSL ?? 0);
+
+            console.log("EXEC_PRODUCT_TREND_LABELS:", labels);
+            console.log("EXEC_PRODUCT_TREND_DATA:", { fiberData, superboxData, adslData });
 
             execTrendChartInstance = new Chart(ctxTrend.getContext("2d"), {
                 type: "line",
                 data: {
                     labels,
                     datasets: [
-                        { label: "⚡ Fiber", data: fiberData, borderColor: "#00A3E0", backgroundColor: "rgba(0,163,224,0.1)", fill: true, tension: 0.3 },
-                        { label: "📦 Superbox", data: superboxData, borderColor: "#FFC72C", backgroundColor: "rgba(255,199,44,0.1)", fill: true, tension: 0.3 },
-                        { label: "🔌 ADSL", data: adslData, borderColor: "#A855F7", backgroundColor: "rgba(168,85,247,0.1)", fill: true, tension: 0.3 }
+                        { label: "⚡ Fiber", data: fiberData, borderColor: "#00A3E0", backgroundColor: "rgba(0,163,224,0.15)", fill: true, tension: 0.3 },
+                        { label: "📦 Superbox", data: superboxData, borderColor: "#FFC72C", backgroundColor: "rgba(255,199,44,0.15)", fill: true, tension: 0.3 },
+                        { label: "🔌 ADSL", data: adslData, borderColor: "#A855F7", backgroundColor: "rgba(168,85,247,0.15)", fill: true, tension: 0.3 }
                     ]
                 },
                 options: {
@@ -1230,12 +1270,15 @@ async function loadExecutiveDashboardData() {
             });
         }
 
-        // Render Top 5 Surging Categories Bar Chart
+        // 2. CHART: Top 5 Surging Categories Bar Chart
         if (execRisingChartInstance) execRisingChartInstance.destroy();
         const ctxRising = document.getElementById("execRisingCategoryChart");
         if (ctxRising && Array.isArray(summary.fastest_rising_categories)) {
-            const catLabels = summary.fastest_rising_categories.map(c => c.category);
-            const catValues = summary.fastest_rising_categories.map(c => c.growth_pct);
+            const catLabels = summary.fastest_rising_categories.map(c => c.sub_category || c.category || "Genel");
+            const catValues = summary.fastest_rising_categories.map(c => c.growth_pct ?? c.growth ?? 0);
+
+            console.log("EXEC_RISING_LABELS:", catLabels);
+            console.log("EXEC_RISING_VALUES:", catValues);
 
             execRisingChartInstance = new Chart(ctxRising.getContext("2d"), {
                 type: "bar",
@@ -1258,6 +1301,66 @@ async function loadExecutiveDashboardData() {
                     scales: {
                         x: { ticks: { color: "#64748B" }, grid: { color: "rgba(255,255,255,0.05)" } },
                         y: { ticks: { color: "#94A3B8" }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // 3. CHART: Daily Volume & Sentiment Analysis
+        if (execVolumeChartInstance) execVolumeChartInstance.destroy();
+        const ctxVolume = document.getElementById("execDailyVolumeChart");
+        if (ctxVolume && Array.isArray(trendData)) {
+            const labels = trendData.map(d => d.day || d.date || "Tarih Yok");
+            const totalVolume = trendData.map(d => d.total ?? 0);
+            const negVolume = trendData.map(d => d.negative_cnt ?? 0);
+
+            execVolumeChartInstance = new Chart(ctxVolume.getContext("2d"), {
+                type: "bar",
+                data: {
+                    labels,
+                    datasets: [
+                        { label: "Toplam Şikâyet Hacmi", data: totalVolume, backgroundColor: "#38BDF8", borderRadius: 4 },
+                        { label: "Negatif Duygulu Şikâyetler", data: negVolume, backgroundColor: "#F87171", borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: "top", labels: { color: "#94A3B8" } }
+                    },
+                    scales: {
+                        x: { ticks: { color: "#64748B" }, grid: { color: "rgba(255,255,255,0.05)" } },
+                        y: { ticks: { color: "#64748B" }, grid: { color: "rgba(255,255,255,0.05)" } }
+                    }
+                }
+            });
+        }
+
+        // 4. CHART: Product Distribution Doughnut Chart
+        if (execDistChartInstance) execDistChartInstance.destroy();
+        const ctxDist = document.getElementById("execProductDistChart");
+        if (ctxDist && summary.product_metrics) {
+            const pm = summary.product_metrics;
+            const distLabels = Object.keys(pm).map(k => `${k} (${pm[k].total || 0})`);
+            const distValues = Object.values(pm).map(v => v.total || 0);
+
+            execDistChartInstance = new Chart(ctxDist.getContext("2d"), {
+                type: "doughnut",
+                data: {
+                    labels: distLabels,
+                    datasets: [{
+                        data: distValues,
+                        backgroundColor: ["#00A3E0", "#FFC72C", "#A855F7"],
+                        borderWidth: 0,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: "bottom", labels: { color: "#94A3B8" } }
                     }
                 }
             });

@@ -140,7 +140,8 @@
                         <div class="kpi-body">
                             <span class="kpi-label">Günlük Değişim (Bugün)</span>
                             <span class="kpi-value" id="exec-daily-cnt">0</span>
-                            <span class="kpi-tag" id="exec-daily-pct">0%</span>
+                            <span class="kpi-tag" id="exec-daily-pct">Yeni Aktivite</span>
+                            <span id="exec-daily-msg" style="font-size: 0.7rem; color: #94A3B8; margin-top: 4px;"></span>
                         </div>
                     </div>
                     <div class="kpi-card glass highlight-green">
@@ -148,7 +149,8 @@
                         <div class="kpi-body">
                             <span class="kpi-label">Haftalık Değişim (7 Gün)</span>
                             <span class="kpi-value" id="exec-weekly-cnt">0</span>
-                            <span class="kpi-tag" id="exec-weekly-pct">0%</span>
+                            <span class="kpi-tag" id="exec-weekly-pct">Yeni Aktivite</span>
+                            <span id="exec-weekly-msg" style="font-size: 0.7rem; color: #94A3B8; margin-top: 4px;"></span>
                         </div>
                     </div>
                     <div class="kpi-card glass highlight-yellow">
@@ -156,7 +158,8 @@
                         <div class="kpi-body">
                             <span class="kpi-label">Aylık Değişim (30 Gün)</span>
                             <span class="kpi-value" id="exec-monthly-cnt">0</span>
-                            <span class="kpi-tag" id="exec-monthly-pct">0%</span>
+                            <span class="kpi-tag" id="exec-monthly-pct">Yeni Aktivite</span>
+                            <span id="exec-monthly-msg" style="font-size: 0.7rem; color: #94A3B8; margin-top: 4px;"></span>
                         </div>
                     </div>
                     <div class="kpi-card glass highlight-red">
@@ -172,7 +175,7 @@
                         <div class="kpi-body">
                             <span class="kpi-label">En Problemli Ürün</span>
                             <span class="kpi-value" id="exec-most-problematic" style="font-size: 1.3rem; color: #38BDF8;">-</span>
-                            <span class="kpi-tag">Aksiyon Gerekli</span>
+                            <span class="kpi-tag" id="exec-most-prob-tag">Aksiyon Gerekli</span>
                         </div>
                     </div>
                 </div>
@@ -181,8 +184,11 @@
                 <div class="charts-grid" style="margin-top: 24px;">
                     <div class="chart-card glass" style="grid-column: span 2;">
                         <div class="chart-header">
-                            <h3>Ürün Bazlı Trend Karşılaştırması (Fiber vs Superbox vs ADSL)</h3>
-                            <span class="info-badge">Son 30 Günlük Zaman Serisi</span>
+                            <div>
+                                <h3>Ürün Bazlı Trend Karşılaştırması (Fiber vs Superbox vs ADSL)</h3>
+                                <div id="exec-sparsity-banner" style="font-size: 0.78rem; color: #FACC15; margin-top: 2px;"></div>
+                            </div>
+                            <span class="info-badge" id="exec-trend-badge">Son 30 Günlük Zaman Serisi</span>
                         </div>
                         <div class="chart-container" style="height: 320px;">
                             <canvas id="execProductTrendChart"></canvas>
@@ -196,6 +202,28 @@
                         </div>
                         <div class="chart-container" style="height: 320px;">
                             <canvas id="execRisingCategoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-grid" style="margin-top: 24px;">
+                    <div class="chart-card glass">
+                        <div class="chart-header">
+                            <h3>Günlük Şikâyet Hacmi & Duygu Analizi</h3>
+                            <span class="info-badge">Gün Bazlı Toplam ve Negatif Oranı</span>
+                        </div>
+                        <div class="chart-container" style="height: 300px;">
+                            <canvas id="execDailyVolumeChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card glass">
+                        <div class="chart-header">
+                            <h3>Ürün Şikâyet Dağılımı</h3>
+                            <span class="info-badge">Fiber | Superbox | ADSL</span>
+                        </div>
+                        <div class="chart-container" style="height: 300px;">
+                            <canvas id="execProductDistChart"></canvas>
                         </div>
                     </div>
                 </div>

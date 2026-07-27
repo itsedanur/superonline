@@ -357,11 +357,21 @@ Metin: "{text}" """
         tot = exec_summary.get("total_complaints", 0)
         prob_prod = exec_summary.get("most_problematic_product", "Fiber")
         crit_ratio = exec_summary.get("critical_ratio_pct", 0.0)
-        weekly_growth = exec_summary.get("weekly_change_pct", 0.0)
+        weekly_metrics = exec_summary.get("weekly_metrics", {})
+        weekly_status = weekly_metrics.get("change_status", "NO_CHANGE")
+        weekly_growth = weekly_metrics.get("change_pct")
+        tot_w = weekly_metrics.get("current_count", exec_summary.get("this_week_complaints", 0))
         rising = exec_summary.get("fastest_rising_categories", [])
 
         # Insight 1: Executive Risk Alert
-        if crit_ratio > 30.0 or weekly_growth > 15.0:
+        if weekly_status == "NEW_ACTIVITY":
+            insights.append({
+                "type": "STABLE",
+                "icon": "ℹ️",
+                "title": "Son 7 Günlük Analiz Kapsamı",
+                "body": f"Son 7 günde toplam {tot_w} şikâyet kaydı analiz edildi. Önceki 7 günlük dönem için yeterli karşılaştırma verisi bulunmadığından büyüme oranı hesaplanamadı. Şikâyetlerin %{crit_ratio}'i Kritik aciliyet seviyesindedir."
+            })
+        elif weekly_growth is not None and weekly_growth > 15.0:
             insights.append({
                 "type": "CRITICAL_ALERT",
                 "icon": "🚨",
@@ -392,12 +402,20 @@ Metin: "{text}" """
         if rising:
             top_rising = rising[0]
             sc_name = top_rising["sub_category"]
-            sc_growth = top_rising["growth_pct"]
+            sc_growth = top_rising.get("growth_pct")
+            sc_status = top_rising.get("change_status")
+            sc_rc = top_rising.get("recent_7d", 0)
+
+            if sc_status == "NEW_ACTIVITY" or sc_growth is None:
+                body_text = f"**{sc_name}** alt başlığında son 7 günde {sc_rc} yeni kayıt tespit edildi (önceki dönem karşılaştırma verisi yok)."
+            else:
+                body_text = f"**{sc_name}** alt başlığında son 7 günde %{sc_growth} oranında değişim tespit edilmiştir. İlgili teknik saha ekiplerine bildirim yapılması önerilir."
+
             insights.append({
                 "type": "TREND_SURGE",
                 "icon": "📈",
                 "title": f"Hızlı Yükselen Şikâyet Konusu: {sc_name}",
-                "body": f"**{sc_name}** alt başlığında son 7 günde %{sc_growth} oranında sıçrama tespit edilmiştir. İlgili teknik saha ekiplerine bildirim yapılması önerilir."
+                "body": body_text
             })
 
         # Insight 4: Strategic Actionable Recommendation
