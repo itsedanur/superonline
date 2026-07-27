@@ -13,6 +13,7 @@ from datetime import datetime
 from nlp_engine import SuperonlineEnterpriseAIEngine
 from scraper import SuperonlinePrototypeScraper
 from database import EnterpriseDatabase
+from social_media.registry import ProviderRegistry
 
 PORT = 8080
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
@@ -20,6 +21,7 @@ DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 ai_engine = SuperonlineEnterpriseAIEngine()
 scraper = SuperonlinePrototypeScraper()
 db = EnterpriseDatabase()
+provider_registry = ProviderRegistry()
 
 active_runs = {}
 ALLOWED_PRODUCTS = ["Fiber", "Superbox", "ADSL"]
@@ -50,6 +52,12 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
         if path in ["/api/config", "/api/v1/config"]:
             self.send_json_response({
                 "publicWebPrototypeEnabled": scraper.is_enabled()
+            })
+
+        # GET /api/v1/social/providers/status
+        elif path == "/api/v1/social/providers/status":
+            self.send_json_response({
+                "providers": provider_registry.get_status()
             })
 
         # GET /api/v1/products/compare

@@ -96,6 +96,8 @@ function handleHashRouting() {
         switchTab("reviewed-complaints");
     } else if (hash === "live-analyzer") {
         switchTab("live-analyzer");
+    } else if (hash === "social-providers") {
+        switchTab("social-providers");
     } else if (hash.startsWith("products/")) {
         const prod = hash.replace("products/", "");
         if (["fiber", "superbox", "adsl", "dsl"].includes(prod)) {
@@ -301,6 +303,9 @@ function switchTab(tabId) {
         window.location.hash = "#/reviewed-complaints";
     } else if (tabId === "live-analyzer") {
         window.location.hash = "#/live-analyzer";
+    } else if (tabId === "social-providers") {
+        window.location.hash = "#/social-providers";
+        loadSocialProvidersStatus();
     }
 
     const activeTab = document.getElementById(`tab-${tabId}`);
@@ -312,7 +317,8 @@ function switchTab(tabId) {
         "live-analyzer": "Canlı AI / LLM Bağlam & Çoklu Ürün Analiz Testi",
         "review-queue": "Manuel İnceleme Kuyruğu",
         "reviewed-complaints": "İncelenen Şikâyetler",
-        "complaints-db": "Veritabanı & Şikayet Kayıtları"
+        "complaints-db": "Veritabanı & Şikayet Kayıtları",
+        "social-providers": "Sosyal Medya Kaynakları"
     };
     document.getElementById("page-title").innerText = titleMap[tabId] || "Superonline AI Platform";
 
@@ -1668,4 +1674,52 @@ async function openReviewHistoryModal(id) {
 function closeReviewHistoryModal() {
     const modal = document.getElementById("modal-review-history");
     if(modal) modal.classList.add("hidden");
+}
+
+async function loadSocialProvidersStatus() {
+    const grid = document.getElementById("social-providers-grid");
+    if (!grid) return;
+    
+    grid.innerHTML = "<div style='color: var(--text-muted);'>Yükleniyor...</div>";
+    
+    try {
+        const res = await fetch(`${API_BASE}/api/v1/social/providers/status`);
+        if (!res.ok) throw new Error("API hatası: " + res.status);
+        const data = await res.json();
+        
+        grid.innerHTML = "";
+        
+        data.providers.forEach(p => {
+            const isEnabled = p.enabled;
+            const statusColor = isEnabled ? "var(--turkcell-blue)" : "var(--text-muted)";
+            const statusText = isEnabled ? "Aktif" : "Devre Dışı";
+            const icon = p.platform === "X" ? "🐦" : 
+                         p.platform === "INSTAGRAM" ? "📸" :
+                         p.platform === "FACEBOOK" ? "👥" : 
+                         p.platform === "TIKTOK" ? "🎵" : "🌐";
+                         
+            grid.innerHTML += `
+                <div class="kpi-card glass" style="border-left: 4px solid ${statusColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div style="font-size: 2rem;">${icon}</div>
+                        <span class="badge-sent" style="background: rgba(148, 163, 184, 0.2); color: ${statusColor};">${statusText}</span>
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <h4 style="margin: 0; font-size: 1.1rem; color: var(--text-primary);">${p.platform}</h4>
+                        <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
+                            Configured: ${p.configured ? 'Evet' : 'Hayır'}<br>
+                            Ready: ${p.ready ? 'Evet' : 'Hayır'}
+                        </p>
+                    </div>
+                    <div style="margin-top: 16px;">
+                        <button class="btn btn-outline" style="width: 100%; opacity: 0.6; cursor: not-allowed;" disabled>Bağlan (Sonraki Aşamada)</button>
+                    </div>
+                </div>
+            `;
+        });
+        
+    } catch (e) {
+        grid.innerHTML = `<div style='color: #F87171;'>Sunucuya bağlanılamadı: ${e.message}</div>`;
+        console.error("Provider status hatası:", e);
+    }
 }
