@@ -420,7 +420,7 @@ class EnterpriseDatabase:
             rows = cursor.fetchall()
             return [dict(r) for r in rows]
 
-    def get_all_complaints(self, product_filter="ALL", date_range="ALL", sort_order="DESC"):
+    def get_all_complaints(self, product_filter="ALL", date_range="ALL", sort_order="DESC", platform_filter="ALL", content_type_filter="ALL"):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             query = "SELECT * FROM complaints WHERE review_status != 'DELETED'"
@@ -428,6 +428,13 @@ class EnterpriseDatabase:
             if product_filter != "ALL":
                 query += " AND (primary_product = ? OR products_json LIKE ?)"
                 params.extend([product_filter, f'%"{product_filter}"%'])
+            if platform_filter != "ALL":
+                query += " AND platform = ?"
+                params.append(platform_filter)
+            if content_type_filter != "ALL":
+                query += " AND content_type = ?"
+                params.append(content_type_filter)
+
             now = datetime.now()
             if date_range == "TODAY":
                 query += " AND created_at >= ?"

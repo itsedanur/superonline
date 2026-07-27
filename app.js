@@ -613,10 +613,14 @@ function populateComplaintsTable(data) {
         } else {
             sourceUrlBtn = `<button type="button" class="btn btn-outline disabled" style="padding: 4px 8px; font-size: 0.75rem; opacity: 0.5; cursor: not-allowed;" title="Kaynak bağlantısı bulunamadı" disabled>🔗 Kaynakta Aç</button>`;
         }
+        
+        const platformLabel = item.platform || "SIKAYETVAR";
+        const contentTypeLabel = item.contentType || "COMPLAINT";
 
         tr.innerHTML = `
             <td><strong style="color: var(--turkcell-blue); cursor: pointer;" data-action="view-complaint" data-complaint-id="${item.id}">${item.id}</strong></td>
-            <td><span class="badge-prod ${srcBadgeCls}" style="font-size:0.7rem;">${decisionSrc}</span></td>
+            <td><span class="badge-prod" style="background: #334155; font-size: 0.7rem;">${platformLabel}</span></td>
+            <td><span class="badge-prod" style="background: #475569; font-size: 0.7rem;">${contentTypeLabel}</span></td>
             <td>${sourceHtml}<br>${finalHtml}</td>
             <td style="max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;" title="${textContent.replace(/"/g, '&quot;')}" data-action="view-complaint" data-complaint-id="${item.id}">${textContent}</td>
             <td><div style="font-weight: 600; font-size: 0.85rem;">${item.mainCategory || item.topic || "Diğer"}</div><div style="font-size: 0.75rem; color: var(--text-muted);">${item.subCategory || ""}</div></td>
@@ -633,16 +637,20 @@ function populateComplaintsTable(data) {
 }
 
 async function filterComplaintsTable() {
+    const platformSelect = document.getElementById("filter-platform");
+    const contentSelect = document.getElementById("filter-content-type");
     const prodSelect = document.getElementById("filter-product");
     const dateSelect = document.getElementById("filter-date");
     const sortSelect = document.getElementById("sort-date");
 
+    const platformFilter = platformSelect ? platformSelect.value : "ALL";
+    const contentFilter = contentSelect ? contentSelect.value : "ALL";
     const prodFilter = prodSelect ? prodSelect.value : "ALL";
     const dateRange = dateSelect ? dateSelect.value : "ALL";
     const sortOrder = sortSelect ? sortSelect.value : "DESC";
 
     try {
-        const url = `${API_BASE}/api/v1/complaints?product=${encodeURIComponent(prodFilter)}&date_range=${encodeURIComponent(dateRange)}&sort=${encodeURIComponent(sortOrder)}`;
+        const url = `${API_BASE}/api/v1/complaints?product=${encodeURIComponent(prodFilter)}&date_range=${encodeURIComponent(dateRange)}&sort=${encodeURIComponent(sortOrder)}&platform=${encodeURIComponent(platformFilter)}&content_type=${encodeURIComponent(contentFilter)}`;
         const res = await fetch(url);
         
         if (!res.ok) {
@@ -1511,7 +1519,14 @@ async function openComplaintDetailModal(id) {
             
             document.getElementById("cd-id").innerText = data.id || "-";
             document.getElementById("cd-date").innerText = data.sourcePublishedAt || data.reviewedAt || "-";
-            document.getElementById("cd-source").innerText = data.source || "-";
+            
+            document.getElementById("cd-platform").innerText = data.platform || data.source || "SIKAYETVAR";
+            document.getElementById("cd-content-type").innerText = data.contentType || "COMPLAINT";
+            document.getElementById("cd-business-unit").innerText = data.businessUnit || "INTERNET_SERVICES";
+            document.getElementById("cd-brand").innerText = data.brand || "SUPERONLINE";
+            document.getElementById("cd-brand-replied").innerText = data.brandReplied ? "Evet" : "Hayır";
+            document.getElementById("cd-case-status").innerText = data.caseStatus || "NEW";
+            
             document.getElementById("cd-status").innerText = data.reviewStatus || "PENDING";
             
             document.getElementById("cd-source-prod").innerText = data.sourceProduct || "-";

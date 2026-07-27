@@ -163,8 +163,16 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
             prod_filter = query.get("product", ["ALL"])[0]
             date_range = query.get("date_range", ["ALL"])[0]
             sort_order = query.get("sort", ["DESC"])[0]
+            platform_filter = query.get("platform", ["ALL"])[0]
+            content_type_filter = query.get("content_type", ["ALL"])[0]
 
-            complaints = db.get_all_complaints(product_filter=prod_filter, date_range=date_range, sort_order=sort_order)
+            complaints = db.get_all_complaints(
+                product_filter=prod_filter, 
+                date_range=date_range, 
+                sort_order=sort_order,
+                platform_filter=platform_filter,
+                content_type_filter=content_type_filter
+            )
             formatted = [self.format_complaint_dict(c) for c in complaints]
             self.send_json_response(formatted)
 
@@ -418,7 +426,19 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
             "engineType": c.get("engine_type", "local_semantic_engine"),
             "promptVersion": c.get("prompt_version", "v3.2-enterprise-context"),
             "recordHash": c.get("record_hash"),
-            "date": str(c.get("created_at", ""))
+            "date": str(c.get("created_at", "")),
+            
+            # New Multi-Source Fields
+            "platform": c.get("platform", "SIKAYETVAR"),
+            "contentType": c.get("content_type", "COMPLAINT"),
+            "businessUnit": c.get("business_unit", "INTERNET_SERVICES"),
+            "brand": c.get("brand", "SUPERONLINE"),
+            "brandReplied": bool(c.get("brand_replied", 0)),
+            "caseStatus": c.get("case_status", "NEW"),
+            "brandReplyAt": str(c.get("brand_reply_at")) if c.get("brand_reply_at") else None,
+            "firstResponseAt": str(c.get("first_response_at")) if c.get("first_response_at") else None,
+            "resolvedAt": str(c.get("resolved_at")) if c.get("resolved_at") else None,
+            "closedAt": str(c.get("closed_at")) if c.get("closed_at") else None
         }
 
     def send_json_response(self, data, status=200):

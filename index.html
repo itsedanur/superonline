@@ -235,6 +235,18 @@
 
             <!-- TAB 1: DASHBOARD -->
             <section id="tab-dashboard" class="tab-content active">
+                <div class="header-banner glass" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; padding: 12px 16px;">
+                    <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">📊 Genel Platform Durumu</h3>
+                    <select id="dash-filter-platform" onchange="loadStats()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary);">
+                        <option value="ALL" selected>Tüm Mecralar</option>
+                        <option value="SIKAYETVAR">Şikayetvar</option>
+                        <option value="X">X (Twitter)</option>
+                        <option value="INSTAGRAM">Instagram</option>
+                        <option value="FACEBOOK">Facebook</option>
+                        <option value="TIKTOK">TikTok</option>
+                    </select>
+                </div>
+
                 <div class="kpi-grid">
                     <div class="kpi-card glass brand-fiber" style="cursor: pointer;" onclick="switchTab('product-fiber')">
                         <div class="kpi-icon">⚡</div>
@@ -731,9 +743,28 @@
                 <div class="table-card glass">
                     <div class="table-header">
                         <h3>🗄️ SQL Veritabanı Şikayet Kayıtları</h3>
-                        <div class="table-filters">
+                        <div class="table-filters" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
+                            <select id="filter-platform" onchange="filterComplaintsTable()">
+                                <option value="ALL" selected>Tüm Mecralar</option>
+                                <option value="SIKAYETVAR">Şikayetvar</option>
+                                <option value="X">X (Twitter)</option>
+                                <option value="INSTAGRAM">Instagram</option>
+                                <option value="FACEBOOK">Facebook</option>
+                                <option value="TIKTOK">TikTok</option>
+                            </select>
+
+                            <select id="filter-content-type" onchange="filterComplaintsTable()">
+                                <option value="ALL" selected>Tüm İçerik Tipleri</option>
+                                <option value="COMPLAINT">Şikâyet</option>
+                                <option value="QUESTION">Soru</option>
+                                <option value="REQUEST">Talep</option>
+                                <option value="PRAISE">Övgü</option>
+                                <option value="COMMENT">Yorum</option>
+                                <option value="CAMPAIGN_INTERACTION">Kampanya Etkileşimi</option>
+                            </select>
+
                             <select id="filter-product" onchange="filterComplaintsTable()">
-                                <option value="ALL" selected>Tüm Ürünler (Fiber, Superbox, DSL, Genel)</option>
+                                <option value="ALL" selected>Tüm Ürünler</option>
                                 <option value="Fiber">Fiber</option>
                                 <option value="Superbox">Superbox</option>
                                 <option value="DSL">DSL</option>
@@ -744,13 +775,13 @@
                             <select id="filter-date" onchange="filterComplaintsTable()">
                                 <option value="ALL" selected>📅 Tüm Zamanlar</option>
                                 <option value="TODAY">📅 Bugün</option>
-                                <option value="WEEK">📅 Son 7 Gün (Bu Hafta)</option>
-                                <option value="MONTH">📅 Son 30 Gün (Bu Ay)</option>
+                                <option value="WEEK">📅 Son 7 Gün</option>
+                                <option value="MONTH">📅 Son 30 Gün</option>
                             </select>
 
                             <select id="sort-date" onchange="filterComplaintsTable()">
-                                <option value="DESC" selected>⬇️ Yeniden Eskiden (En Yeni)</option>
-                                <option value="ASC">⬆️ Eskiden Yeniye (En Eski)</option>
+                                <option value="DESC" selected>⬇️ Yeniden Eskiden</option>
+                                <option value="ASC">⬆️ Eskiden Yeniye</option>
                             </select>
                         </div>
                     </div>
@@ -759,7 +790,8 @@
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Karar Kaynağı</th>
+                                    <th>Mecra</th>
+                                    <th>İçerik Tipi</th>
                                     <th>Kaynak / Nihai Ürün</th>
                                     <th>Müşteri Metni (KVKK Maskeli)</th>
                                     <th>Ana / Alt Kategori</th>
@@ -876,7 +908,12 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
                     <div><strong>ID:</strong> <span id="cd-id"></span></div>
                     <div><strong>Tarih:</strong> <span id="cd-date"></span></div>
-                    <div><strong>Kaynak:</strong> <span id="cd-source"></span></div>
+                    <div><strong>Mecra:</strong> <span id="cd-platform"></span></div>
+                    <div><strong>İçerik Tipi:</strong> <span id="cd-content-type"></span></div>
+                    <div><strong>İş Birimi:</strong> <span id="cd-business-unit"></span></div>
+                    <div><strong>Marka:</strong> <span id="cd-brand"></span></div>
+                    <div><strong>Marka Cevap Verdi mi?:</strong> <span id="cd-brand-replied"></span></div>
+                    <div><strong>Talep Durumu:</strong> <span id="cd-case-status"></span></div>
                     <div><strong>İnceleme Durumu:</strong> <span id="cd-status"></span></div>
                     <div><strong>Kaynak Ürün:</strong> <span id="cd-source-prod"></span></div>
                     <div><strong>AI Ürünü:</strong> <span id="cd-ai-prod"></span></div>
