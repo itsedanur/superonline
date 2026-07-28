@@ -346,6 +346,57 @@ class EnterpriseDatabase:
             ))
             conn.commit()
 
+    def save_social_content(self, content, dry_run=True):
+        from social_media.utils import generate_social_hash
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Check duplicate by external_id and platform
+            if content.external_id:
+                cursor.execute("SELECT id FROM complaints WHERE platform = ? AND external_id = ?", (content.platform, content.external_id))
+                if cursor.fetchone():
+                    return "DUPLICATE_EXTERNAL_ID"
+            
+            # Fallback duplicate check via hash
+            content_hash = generate_social_hash(content.platform, content.text, content.source_author_username, content.source_created_at)
+            cursor.execute("SELECT id FROM complaints WHERE record_hash = ?", (content_hash,))
+            if cursor.fetchone():
+                return "DUPLICATE_HASH"
+                
+            if dry_run:
+                return "NEW_PREVIEW"
+                
+            # Perform insert
+            import uuid
+            new_id = f"SOC-{content.platform}-{uuid.uuid4().hex[:8]}".upper()
+            
+            cursor.execute("""
+                INSERT INTO complaints (
+                    id, source, source_type, source_url, external_id, raw_content, masked_content, title,
+                    primary_product, source_product, main_category, sub_category, topic_category,
+                    platform, content_type, business_unit, brand, brand_replied, case_status,
+                    source_author_masked, created_at, record_hash,
+                    like_count, comment_count, share_count, view_count, engagement_count,
+                    source_metadata_json, needs_human_review, review_status
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?,
+                    ?, ?, ?,
+                    ?, ?, ?, ?, ?,
+                    ?, ?, ?
+                )
+            """, (
+                new_id, "Sosyal Medya", "public_web_prototype", content.source_url, content.external_id, content.text, content.text, "",
+                content.brand, content.brand, "Sosyal Medya Girdisi", "Genel", "Sosyal Medya Girdisi",
+                content.platform, content.content_type, content.business_unit, content.brand, content.brand_replied, "NEW",
+                content.source_author_username, content.source_created_at or datetime.now().isoformat(), content_hash,
+                content.like_count, content.comment_count, content.share_count, content.view_count, content.engagement_count,
+                content.source_metadata_json, 1, "PENDING"
+            ))
+            conn.commit()
+            return "INSERTED"
+
     def create_scrape_run(self, run_id, strategy="INCREMENTAL", requested_products=None, requested_pages=1):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -578,6 +629,166 @@ class EnterpriseDatabase:
             rows = cursor.fetchall()
             return {r["urgency"]: r["count"] for r in rows}
 
+    def get_product_analytics(self, product, include_legacy=False):
+        aliases = {
+            "BiP": ["BiP", "BIP", "bip"],
+            "TV+": ["TV+", "TV PLUS", "TV_PLUS", "TVPLUS"],
+            "fizy": ["fizy", "FIZY"],
+            "Game+": ["Game+", "GAME+", "GAME PLUS", "GAME_PLUS", "GAMEPLUS", "GeForce NOW Türkiye"],
+            "lifebox": ["lifebox", "LIFEBOX", "LIFE BOX"],
+            "Fiber": ["Fiber", "FIBER", "fiber"],
+            "Superbox": ["Superbox", "SUPERBOX", "superbox"],
+            "ADSL": ["ADSL", "adsl", "DSL", "dsl"]
+        }
+        product_aliases = aliases.get(product, [product])
+        
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            leg_sql = "" if include_legacy else " AND legacy_record = 0"
+            
+            alias_placeholders = ",".join(["?"] * len(product_aliases))
+            
+            json_conditions = " OR ".join(["products_json LIKE ?"] * len(product_aliases))
+            base_sql = f"WHERE (primary_product IN ({alias_placeholders}) OR {json_conditions}) AND review_status != 'DELETED' {leg_sql}"
+            
+            params = []
+            params.extend(product_aliases)
+            params.extend([f'%"{a}"%' for a in product_aliases])
+
+            # Base metrics
+            cursor.execute(f"""
+                SELECT 
+                    COUNT(*) as total_content,
+                    SUM(CASE WHEN brand_replied = 1 THEN 1 ELSE 0 END) as answered_count,
+                    SUM(CASE WHEN case_status IN ('NEW', 'OPEN', 'IN_PROGRESS') THEN 1 ELSE 0 END) as open_count,
+                    SUM(CASE WHEN case_status IN ('RESOLVED', 'CLOSED') THEN 1 ELSE 0 END) as closed_count,
+                    AVG(CASE WHEN first_response_at IS NOT NULL THEN (julianday(first_response_at) - julianday(created_at)) * 24 ELSE NULL END) as avg_first_reply_hours,
+                    AVG(CASE WHEN closed_at IS NOT NULL THEN (julianday(closed_at) - julianday(created_at)) * 24 ELSE NULL END) as avg_close_hours
+                FROM complaints
+                {base_sql}
+            """, params)
+            metrics = dict(cursor.fetchone())
+
+            # Weekly change
+            now = datetime.now()
+            week_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+            two_weeks_ago = (now - timedelta(days=14)).strftime("%Y-%m-%d")
+
+            cursor.execute(f"SELECT COUNT(*) as cnt FROM complaints {base_sql} AND created_at >= ?", params + [f"{week_ago} 00:00:00"])
+            this_week = cursor.fetchone()["cnt"]
+
+            cursor.execute(f"SELECT COUNT(*) as cnt FROM complaints {base_sql} AND created_at >= ? AND created_at < ?", params + [f"{two_weeks_ago} 00:00:00", f"{week_ago} 00:00:00"])
+            last_week = cursor.fetchone()["cnt"]
+
+            weekly_change_pct = None
+            if last_week > 0:
+                weekly_change_pct = round(((this_week - last_week) / last_week * 100), 1)
+
+            # Content Type Distribution (with fallback)
+            cursor.execute(f"""
+                SELECT 
+                    COALESCE(NULLIF(content_type, ''), CASE WHEN source = 'Şikayetvar' THEN 'COMPLAINT' ELSE 'GENERAL' END) as c_type, 
+                    COUNT(*) as count 
+                FROM complaints {base_sql} 
+                GROUP BY c_type 
+                ORDER BY count DESC
+            """, params)
+            content_type_rows = cursor.fetchall()
+
+            content_type_labels = {
+                "COMPLAINT": "Şikâyet",
+                "QUESTION": "Soru",
+                "REQUEST": "Talep",
+                "PRAISE": "Övgü",
+                "THANKS": "Teşekkür",
+                "TECH_SUPPORT": "Teknik Destek",
+                "SUGGESTION": "Öneri",
+                "GENERAL": "Genel Yorum"
+            }
+            
+            total_content = metrics["total_content"] or 0
+            
+            content_type_distribution = []
+            for r in content_type_rows:
+                k = r["c_type"]
+                cnt = r["count"]
+                content_type_distribution.append({
+                    "key": k,
+                    "label": content_type_labels.get(k, k),
+                    "count": cnt,
+                    "percentage": round((cnt / total_content * 100), 1) if total_content > 0 else 0
+                })
+
+            # Platform Distribution (with fallback)
+            cursor.execute(f"""
+                SELECT 
+                    COALESCE(NULLIF(platform, ''), CASE WHEN source = 'Şikayetvar' THEN 'SIKAYETVAR' ELSE 'UNKNOWN' END) as plat, 
+                    COUNT(*) as count 
+                FROM complaints {base_sql} 
+                GROUP BY plat 
+                ORDER BY count DESC
+            """, params)
+            platform_rows = cursor.fetchall()
+            
+            platform_labels = {
+                "SIKAYETVAR": "Şikayetvar",
+                "X": "X (Twitter)",
+                "INSTAGRAM": "Instagram",
+                "FACEBOOK": "Facebook"
+            }
+            
+            platform_distribution = []
+            for r in platform_rows:
+                k = r["plat"]
+                cnt = r["count"]
+                platform_distribution.append({
+                    "key": k,
+                    "label": platform_labels.get(k, k),
+                    "count": cnt,
+                    "percentage": round((cnt / total_content * 100), 1) if total_content > 0 else 0
+                })
+
+            # Topic Distribution (with fallback priorities)
+            cursor.execute(f"""
+                SELECT 
+                    COALESCE(NULLIF(main_category, ''), NULLIF(sub_category, ''), NULLIF(topic_category, '')) as topic, 
+                    COUNT(*) as count 
+                FROM complaints {base_sql} 
+                GROUP BY topic 
+                ORDER BY count DESC
+            """, params)
+            topic_rows = cursor.fetchall()
+            
+            topic_distribution = []
+            for r in topic_rows:
+                if r["topic"] is None:
+                    continue
+                cnt = r["count"]
+                topic_distribution.append({
+                    "key": r["topic"],
+                    "label": r["topic"],
+                    "count": cnt,
+                    "percentage": round((cnt / total_content * 100), 1) if total_content > 0 else 0
+                })
+                
+            has_topic_data = len(topic_distribution) > 0
+
+            return {
+                "product": product,
+                "total_content": total_content,
+                "answered_count": metrics["answered_count"] or 0,
+                "open_count": metrics["open_count"] or 0,
+                "closed_count": metrics["closed_count"] or 0,
+                "weekly_change_percentage": weekly_change_pct,
+                "average_first_response_hours": round(metrics["avg_first_reply_hours"], 1) if metrics["avg_first_reply_hours"] else None,
+                "average_closure_hours": round(metrics["avg_close_hours"], 1) if metrics["avg_close_hours"] else None,
+                "content_type_distribution": content_type_distribution,
+                "platform_distribution": platform_distribution,
+                "topic_distribution": topic_distribution,
+                "has_data": total_content > 0,
+                "has_topic_data": has_topic_data
+            }
+
     def get_product_accuracy(self, product, include_legacy=False):
         with self.get_connection() as conn:
             cursor = conn.cursor()
@@ -666,7 +877,7 @@ class EnterpriseDatabase:
             cursor = conn.cursor()
             query = """
                 SELECT * FROM complaints 
-                WHERE review_status = 'PENDING'
+                WHERE review_status IN ('PENDING', 'REVIEW_PENDING', 'DEFERRED')
             """
             params = []
 
@@ -724,7 +935,7 @@ class EnterpriseDatabase:
             cursor = conn.cursor()
             query = """
                 SELECT * FROM complaints 
-                WHERE review_status IN ('APPROVED', 'CORRECTED', 'REANALYZED', 'REJECTED')
+                WHERE review_status IN ('APPROVED', 'CORRECTED', 'REJECTED')
             """
             params = []
 
@@ -783,7 +994,7 @@ class EnterpriseDatabase:
             """, (now_str, reviewed_by, complaint_id))
             conn.commit()
 
-            self.add_review_history(complaint_id, "APPROVE", old_values={"review_status": old_data["review_status"]}, new_values={"review_status": "APPROVED"}, note="AI sonucu uzman tarafından onaylandı", reviewed_by=reviewed_by)
+            self.add_review_history(complaint_id, "AI_APPROVED", old_values={"review_status": old_data["review_status"]}, new_values={"review_status": "APPROVED"}, note="AI sonucu uzman tarafından onaylandı", reviewed_by=reviewed_by)
             return True, "Kayıt onaylandı"
 
     def review_and_correct_complaint(self, complaint_id, update_dict, reviewed_by="Uzman Analist"):
@@ -858,15 +1069,16 @@ class EnterpriseDatabase:
             ))
             conn.commit()
 
-            self.add_review_history(complaint_id, "MANUAL_CORRECT", old_values=old_data, new_values=corrected_fields, note=note, reviewed_by=reviewed_by)
+            self.add_review_history(complaint_id, "CORRECTED_AND_APPROVED", old_values=old_data, new_values=corrected_fields, note=note, reviewed_by=reviewed_by)
             return True, "Kayıt düzenlendi ve onaylandı"
 
     def defer_complaint(self, complaint_id, note="İnceleme ertelendi", reviewed_by="Uzman Analist"):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("UPDATE complaints SET review_status = 'PENDING', review_note = ? WHERE id = ?", (note, complaint_id))
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute("UPDATE complaints SET review_status = 'DEFERRED', review_note = ?, reviewed_at = ?, reviewed_by = ? WHERE id = ?", (note, now_str, reviewed_by, complaint_id))
             conn.commit()
-            self.add_review_history(complaint_id, "DEFER", note=note, reviewed_by=reviewed_by)
+            self.add_review_history(complaint_id, "DEFERRED", note=note, reviewed_by=reviewed_by)
             return True, "İncelenme ertelendi"
 
     def reject_complaint(self, complaint_id, note="Kayıt reddedildi", reviewed_by="Uzman Analist"):
@@ -887,7 +1099,7 @@ class EnterpriseDatabase:
                 WHERE id = ?
             """, (note, now_str, reviewed_by, complaint_id))
             conn.commit()
-            self.add_review_history(complaint_id, "REJECT", old_values={"review_status": old_row["review_status"]}, new_values={"review_status": "REJECTED"}, note=note, reviewed_by=reviewed_by)
+            self.add_review_history(complaint_id, "REJECTED", old_values={"review_status": old_row["review_status"]}, new_values={"review_status": "REJECTED"}, note=note, reviewed_by=reviewed_by)
             return True, "Kayıt reddedildi"
 
     def delete_complaint(self, complaint_id, reviewed_by="Uzman Analist"):

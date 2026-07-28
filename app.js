@@ -17,6 +17,9 @@ let topicChartInstance = null;
 let pdTrendChartInstance = null;
 let pdSentimentChartInstance = null;
 let pdUrgencyChartInstance = null;
+let pdContentTypeChartInstance = null;
+let pdPlatformChartInstance = null;
+let pdTopicChartInstance = null;
 
 let currentComplaints = [];
 let currentReviewQueue = [];
@@ -286,7 +289,18 @@ function switchTab(tabId) {
             const tabEl = document.getElementById("tab-product-detail");
             if (tabEl) tabEl.classList.add("active");
             const prod = subProd.toUpperCase();
-            const prodName = prod === "FIBER" ? "Fiber" : (prod === "SUPERBOX" ? "Superbox" : "ADSL");
+            const prodNameMap = {
+                "FIBER": "Fiber",
+                "SUPERBOX": "Superbox",
+                "ADSL": "ADSL",
+                "DSL": "ADSL",
+                "BIP": "BiP",
+                "TV+": "TV+",
+                "FIZY": "fizy",
+                "GAME+": "Game+",
+                "LIFEBOX": "lifebox"
+            };
+            const prodName = prodNameMap[prod] || subProd;
             loadProductDetailData(prodName);
         }
         return;
@@ -333,171 +347,190 @@ function switchTab(tabId) {
     }
 }
 
-// PHASE 2.3 PRODUCT DETAIL & COMPARE LOGIC
 async function loadProductDetailData(productName) {
     currentSelectedProduct = productName;
 
     const titleEl = document.getElementById("pd-title");
     if (titleEl) {
-        const icon = productName === "Fiber" ? "⚡" : (productName === "Superbox" ? "📦" : "🔌");
-        titleEl.innerHTML = `${icon} ${productName} İnternet Analiz Detayı`;
+        const icon = ["Fiber", "Superbox", "ADSL", "DSL"].includes(productName) ? "🔌" : "📱";
+        titleEl.innerHTML = `${icon} ${productName} Analiz Detayı`;
     }
 
     try {
-        const [sumRes, trendRes, catRes, sentRes, urgRes] = await Promise.all([
-            fetch(`${API_BASE}/api/v1/products/${productName}/summary`),
-            fetch(`${API_BASE}/api/v1/products/${productName}/trend?days=30`),
-            fetch(`${API_BASE}/api/v1/products/${productName}/categories`),
-            fetch(`${API_BASE}/api/v1/products/${productName}/sentiment`),
-            fetch(`${API_BASE}/api/v1/products/${productName}/urgency`)
-        ]);
-
-        if (sumRes.ok) {
-            const summary = await sumRes.json();
-            document.getElementById("pd-kpi-total").innerText = summary.total_complaints.toLocaleString('tr-TR');
-            document.getElementById("pd-kpi-today").innerText = summary.today_complaints.toLocaleString('tr-TR');
-            document.getElementById("pd-kpi-week").innerText = summary.last_7_days_complaints.toLocaleString('tr-TR');
-            document.getElementById("pd-kpi-neg-ratio").innerText = `%${summary.negative_ratio_pct}`;
-            document.getElementById("pd-kpi-crit").innerText = summary.critical_count.toLocaleString('tr-TR');
-            document.getElementById("pd-kpi-pending").innerText = summary.pending_review_count.toLocaleString('tr-TR');
-            document.getElementById("pd-kpi-conflict").innerText = summary.product_conflict_count.toLocaleString('tr-TR');
-            
-            const acc = summary.accuracy;
-            if (acc && acc.total_manually_reviewed > 0) {
-                document.getElementById("pd-kpi-accuracy").innerText = `%${acc.product_accuracy_pct}`;
+        const res = await fetch(`${API_BASE}/api/v1/products/${productName}/analytics`);
+        if (!res.ok) throw new Error("API hatası: " + res.status);
+        
+        const summary = await res.json();
+        
+        document.getElementById("pd-kpi-total").innerText = summary.total_content.toLocaleString('tr-TR');
+        
+        const weeklyTag = document.getElementById("pd-kpi-weekly-change");
+        if (summary.weekly_change_percentage !== null && summary.weekly_change_percentage !== undefined) {
+            if (summary.weekly_change_percentage >= 0) {
+                weeklyTag.style.background = "rgba(34, 197, 94, 0.2)";
+                weeklyTag.style.color = "#4ADE80";
+                weeklyTag.innerText = `+${summary.weekly_change_percentage}% Haftalık`;
             } else {
-                document.getElementById("pd-kpi-accuracy").innerText = "Yeterli Veri Yok";
+                weeklyTag.style.background = "rgba(239, 68, 68, 0.2)";
+                weeklyTag.style.color = "#EF4444";
+                weeklyTag.innerText = `${summary.weekly_change_percentage}% Haftalık`;
             }
+        } else {
+            weeklyTag.style.background = "rgba(148, 163, 184, 0.2)";
+            weeklyTag.style.color = "#94A3B8";
+            weeklyTag.innerText = "Karşılaştırma verisi yok";
         }
-
-        if (trendRes.ok) {
-            const trendData = await trendRes.json();
-            renderProductTrendChart(trendData);
+        
+        document.getElementById("pd-kpi-replied").innerText = summary.answered_count.toLocaleString('tr-TR');
+        const replyRate = (summary.answered_count / summary.total_content * 100) || 0;
+        document.getElementById("pd-kpi-reply-rate").innerText = `%${replyRate.toFixed(1)} Oran`;
+        
+        document.getElementById("pd-kpi-open-closed").innerText = `${summary.open_count.toLocaleString('tr-TR')} / ${summary.closed_count.toLocaleString('tr-TR')}`;
+        
+        const avgFirst = summary.average_first_response_hours;
+        const avgClose = summary.average_closure_hours;
+        if (avgFirst === null && avgClose === null) {
+            document.getElementById("pd-kpi-times").innerText = "Veri yok";
+        } else {
+            const firstStr = avgFirst !== null ? `${avgFirst}s` : "Veri yok";
+            const closeStr = avgClose !== null ? `${avgClose}s` : "Veri yok";
+            document.getElementById("pd-kpi-times").innerText = `${firstStr} / ${closeStr}`;
         }
-
-        if (sentRes.ok && urgRes.ok) {
-            const sentData = await sentRes.json();
-            const urgData = await urgRes.json();
-            renderProductDistributionCharts(sentData, urgData);
-        }
-
-        if (catRes.ok) {
-            const catData = await catRes.json();
-            renderTop5IssuesTable(catData.top_5_issues || []);
-        }
+        
+        renderProductAnalyticsCharts(summary);
 
     } catch (e) {
         console.log("Product detail fetch error:", e);
     }
 }
 
-function renderProductTrendChart(trendData) {
-    if (pdTrendChartInstance) pdTrendChartInstance.destroy();
-    const ctx = document.getElementById("productTrendChart");
-    if (!ctx) return;
+function renderProductAnalyticsCharts(data) {
+    if (pdContentTypeChartInstance) pdContentTypeChartInstance.destroy();
+    if (pdPlatformChartInstance) pdPlatformChartInstance.destroy();
+    if (pdTopicChartInstance) pdTopicChartInstance.destroy();
 
-    const labels = trendData.length ? trendData.map(d => d.day) : ["Tarih Yok"];
-    const totals = trendData.length ? trendData.map(d => d.total) : [0];
-    const negatives = trendData.length ? trendData.map(d => d.negative_cnt) : [0];
+    const chartContainer1 = document.getElementById("productContentTypeChart")?.parentElement;
+    const chartContainer2 = document.getElementById("productPlatformChart")?.parentElement;
+    const chartContainer3 = document.getElementById("productTopicChart")?.parentElement;
 
-    pdTrendChartInstance = new Chart(ctx.getContext("2d"), {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: "Toplam Şikayet",
-                    data: totals,
-                    borderColor: "#00A3E0",
-                    backgroundColor: "rgba(0, 163, 224, 0.1)",
-                    fill: true,
-                    tension: 0.3
-                },
-                {
-                    label: "Negatif Şikayet",
-                    data: negatives,
-                    borderColor: "#EF4444",
-                    backgroundColor: "rgba(239, 68, 68, 0.1)",
-                    fill: true,
-                    tension: 0.3
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { labels: { color: "#94A3B8" } } },
-            scales: {
-                x: { ticks: { color: "#94A3B8" }, grid: { display: false } },
-                y: { ticks: { color: "#94A3B8" }, grid: { color: "rgba(255, 255, 255, 0.05)" } }
-            }
-        }
-    });
-}
-
-function renderProductDistributionCharts(sentData, urgData) {
-    if (pdSentimentChartInstance) pdSentimentChartInstance.destroy();
-    if (pdUrgencyChartInstance) pdUrgencyChartInstance.destroy();
-
-    const ctx1 = document.getElementById("productSentimentChart");
-    if (ctx1) {
-        pdSentimentChartInstance = new Chart(ctx1.getContext("2d"), {
-            type: "doughnut",
-            data: {
-                labels: Object.keys(sentData),
-                datasets: [{
-                    data: Object.values(sentData),
-                    backgroundColor: ["#EF4444", "#64748B", "#10B981"]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: "bottom", labels: { color: "#94A3B8" } } }
-            }
-        });
-    }
-
-    const ctx2 = document.getElementById("productUrgencyChart");
-    if (ctx2) {
-        pdUrgencyChartInstance = new Chart(ctx2.getContext("2d"), {
-            type: "doughnut",
-            data: {
-                labels: Object.keys(urgData),
-                datasets: [{
-                    data: Object.values(urgData),
-                    backgroundColor: ["#DC2626", "#F97316", "#FBBF24", "#34D399"]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: "bottom", labels: { color: "#94A3B8" } } }
-            }
-        });
-    }
-}
-
-function renderTop5IssuesTable(issues) {
-    const tbody = document.getElementById("pd-top5-tbody");
-    if (!tbody) return;
-    tbody.innerHTML = "";
-
-    if (!issues || issues.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:16px; color:var(--text-muted);">Sorun verisi bulunamadı.</td></tr>`;
-        return;
-    }
-
-    issues.forEach((item, index) => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-            <td><strong>#${index + 1}</strong></td>
-            <td><strong>${item.sub_category}</strong></td>
-            <td><span class="info-badge">${item.count} adet</span></td>
-            <td><span class="badge-sent negative">⚡ Kritik İncele</span></td>
+    if (!data.has_data) {
+        const emptyStateHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 220px; text-align: center; color: var(--text-muted);">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px; opacity: 0.5;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <h4 style="margin: 0 0 8px 0; color: #FFF; font-size: 1.1rem;">Henüz veri bulunmuyor</h4>
+                <p style="margin: 0 0 16px 0; max-width: 300px; font-size: 0.9rem;">Bu ürün için sisteme aktarılmış gerçek sosyal medya veya Şikayetvar içeriği bulunmamaktadır.</p>
+                <button class="btn btn-primary" onclick="switchTab('social-providers')">Veri Kaynaklarına Git</button>
+            </div>
         `;
-        tbody.appendChild(tr);
-    });
+        if (chartContainer1) chartContainer1.innerHTML = emptyStateHTML;
+        if (chartContainer2) chartContainer2.parentElement.style.display = "none";
+        return;
+    } else {
+        if (chartContainer1) chartContainer1.innerHTML = '<canvas id="productContentTypeChart"></canvas>';
+        if (chartContainer2) {
+            chartContainer2.parentElement.style.display = "grid";
+            chartContainer2.innerHTML = '<canvas id="productPlatformChart"></canvas>';
+            chartContainer3.innerHTML = '<canvas id="productTopicChart"></canvas>';
+        }
+    }
+
+    // Content Type Chart
+    const ctxCT = document.getElementById("productContentTypeChart");
+    if (ctxCT && data.content_type_distribution) {
+        chartContainer1.style.height = "280px";
+        const labels = data.content_type_distribution.map(d => d.label);
+        const counts = data.content_type_distribution.map(d => d.count);
+        pdContentTypeChartInstance = new Chart(ctxCT.getContext("2d"), {
+            type: "bar",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "İçerik Sayısı",
+                    data: counts,
+                    backgroundColor: ["#EF4444", "#3B82F6", "#F59E0B", "#10B981", "#22C55E", "#8B5CF6", "#EC4899", "#6B7280"]
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const val = context.raw;
+                                const pct = data.content_type_distribution[context.dataIndex].percentage;
+                                return ` ${val} (${pct}%)`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: "#94A3B8" }, grid: { color: "rgba(255, 255, 255, 0.05)" } },
+                    y: { ticks: { color: "#94A3B8" }, grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // Platform Chart
+    const ctxPlat = document.getElementById("productPlatformChart");
+    if (ctxPlat && data.platform_distribution) {
+        chartContainer2.style.height = "280px";
+        const labels = data.platform_distribution.map(d => d.label);
+        const counts = data.platform_distribution.map(d => d.count);
+        pdPlatformChartInstance = new Chart(ctxPlat.getContext("2d"), {
+            type: "doughnut",
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: counts,
+                    backgroundColor: ["#14B8A6", "#3B82F6", "#8B5CF6", "#F43F5E"],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: "right", labels: { color: "#94A3B8" } } },
+                cutout: "70%"
+            }
+        });
+    }
+
+    // Topic Chart
+    const ctxTopic = document.getElementById("productTopicChart");
+    if (ctxTopic) {
+        chartContainer3.style.height = "280px";
+        if (data.has_topic_data && data.topic_distribution.length > 0) {
+            const labels = data.topic_distribution.map(d => d.label);
+            const counts = data.topic_distribution.map(d => d.count);
+            pdTopicChartInstance = new Chart(ctxTopic.getContext("2d"), {
+                type: "doughnut",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: ["#F59E0B", "#10B981", "#3B82F6", "#EF4444", "#8B5CF6", "#EC4899"],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: "right", labels: { color: "#94A3B8" } } },
+                    cutout: "70%"
+                }
+            });
+        } else {
+            chartContainer3.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: var(--text-muted);">
+                    <p style="margin: 0; font-size: 0.9rem;">Bu kayıtlar için konu analizi henüz tamamlanmamış.</p>
+                </div>
+            `;
+        }
+    }
 }
 
 async function loadProductCompareData() {
@@ -859,11 +892,11 @@ async function submitApproveAiReview() {
     try {
         const res = await fetch(`${API_BASE}/api/v1/complaints/${currentActiveItem.id}/approve`, { method: "POST" });
         if (res.ok) {
-            alert(`✅ ${currentActiveItem.id} AI sonucu başarıyla onaylandı.`);
+            showEnterpriseModal("Başarılı", `<p>✅ ${currentActiveItem.id} AI sonucu başarıyla onaylandı.</p>`);
             closeReviewDetailModal();
 
             // Instantly remove from DOM
-            const row = document.querySelector(`tr:has(button[data-complaint-id="${currentActiveItem.id}"])`);
+            const row = document.querySelector(`button[data-complaint-id="${currentActiveItem.id}"]`)?.closest("tr");
             if(row) row.remove();
             const badge = document.getElementById("nav-review-badge");
             if(badge) badge.innerText = Math.max(0, parseInt(badge.innerText)-1);
@@ -872,7 +905,7 @@ async function submitApproveAiReview() {
             loadDashboardData();
         }
     } catch (e) {
-        alert("Onaylama hatası.");
+        showEnterpriseModal("Hata", "<p>Onaylama hatası.</p>");
     }
 }
 
@@ -896,11 +929,11 @@ async function submitEditReview() {
             body: JSON.stringify(payload)
         });
         if (res.ok) {
-            alert(`✏️ ${currentActiveItem.id} kaydı başarıyla düzenlendi ve onaylandı.`);
+            showEnterpriseModal("Başarılı", `<p>✏️ ${currentActiveItem.id} kaydı başarıyla düzenlendi ve onaylandı.</p>`);
             closeReviewDetailModal();
             
             // Instantly remove from DOM
-            const row = document.querySelector(`tr:has(button[data-complaint-id="${currentActiveItem.id}"])`);
+            const row = document.querySelector(`button[data-complaint-id="${currentActiveItem.id}"]`)?.closest("tr");
             if(row) row.remove();
             const badge = document.getElementById("nav-review-badge");
             if(badge) badge.innerText = Math.max(0, parseInt(badge.innerText)-1);
@@ -912,10 +945,10 @@ async function submitEditReview() {
             }
         } else {
             const errData = await res.json();
-            alert(`Hata: ${errData.error}`);
+            showEnterpriseModal("Hata", `<p>Hata: ${errData.error}</p>`);
         }
     } catch (e) {
-        alert("Düzenleme kaydetme hatası.");
+        showEnterpriseModal("Hata", "<p>Düzenleme kaydetme hatası.</p>");
     }
 }
 
@@ -936,27 +969,28 @@ async function submitReanalyzeReview() {
             `;
             compBox.classList.remove("hidden");
             
+            
             // Instantly remove from DOM
-            const row = document.querySelector(`tr:has(button[data-complaint-id="${currentActiveItem.id}"])`);
+            const row = document.querySelector(`button[data-complaint-id="${currentActiveItem.id}"]`)?.closest("tr");
             if(row) row.remove();
             const badge = document.getElementById("nav-review-badge");
             if(badge) badge.innerText = Math.max(0, parseInt(badge.innerText)-1);
             
             setTimeout(() => {
                 closeReviewDetailModal();
+                showEnterpriseModal("Bilgi", "<p>AI analizi yenilendi. Sonucu onaylamadan kayıt kuyruktan çıkarılmayacaktır.</p>");
                 loadReviewQueueData();
                 loadDashboardData();
             }, 3000);
         }
     } catch (e) {
-        alert("Yeniden analiz hatası.");
+        showEnterpriseModal("Hata", "<p>Yeniden analiz hatası.</p>");
     }
 }
 
 async function submitDeferReview() {
     if (!currentActiveItem) return;
-    const note = prompt("Erteleme sebebini yazın:", "Daha sonra incelenecek");
-    if (note === null) return;
+    const note = document.getElementById("edit-note").value || "Daha sonra incelenecek";
 
     try {
         const res = await fetch(`${API_BASE}/api/v1/complaints/${currentActiveItem.id}/defer`, {
@@ -965,19 +999,22 @@ async function submitDeferReview() {
             body: JSON.stringify({ note })
         });
         if (res.ok) {
-            alert(`⏸️ ${currentActiveItem.id} incelemesi ertelendi.`);
+            showEnterpriseModal("Bilgi", `<p>Kayıt ertelendi ve inceleme kuyruğunda tutulmaya devam edecek.</p>`);
             closeReviewDetailModal();
             loadReviewQueueData();
         }
     } catch (e) {
-        alert("Erteleme hatası.");
+        showEnterpriseModal("Hata", "<p>Erteleme hatası.</p>");
     }
 }
 
 async function submitRejectReview() {
     if (!currentActiveItem) return;
-    const note = prompt("Reddetme sebebini yazın:", "Geçersiz veya alakasız kayıt");
-    if (note === null) return;
+    const note = document.getElementById("edit-note").value;
+    if (!note || note.trim() === "") {
+        showEnterpriseModal("Uyarı", "<p>Lütfen reddetme nedenini Uzman İnceleme Notu alanına yazın.</p>");
+        return;
+    }
 
     try {
         const res = await fetch(`${API_BASE}/api/v1/complaints/${currentActiveItem.id}/reject`, {
@@ -986,11 +1023,11 @@ async function submitRejectReview() {
             body: JSON.stringify({ note })
         });
         if (res.ok) {
-            alert(`❌ ${currentActiveItem.id} kaydı reddedildi.`);
+            showEnterpriseModal("Başarılı", `<p>İnceleme başarıyla tamamlandı. Kayıt İncelenen Şikâyetler bölümüne taşındı.</p>`);
             closeReviewDetailModal();
             
             // Instantly remove from DOM
-            const row = document.querySelector(`tr:has(button[data-complaint-id="${currentActiveItem.id}"])`);
+            const row = document.querySelector(`button[data-complaint-id="${currentActiveItem.id}"]`)?.closest("tr");
             if(row) row.remove();
             const badge = document.getElementById("nav-review-badge");
             if(badge) badge.innerText = Math.max(0, parseInt(badge.innerText)-1);
@@ -999,7 +1036,7 @@ async function submitRejectReview() {
             loadDashboardData();
         }
     } catch (e) {
-        alert("Reddetme hatası.");
+        showEnterpriseModal("Hata", "<p>Reddetme hatası.</p>");
     }
 }
 
@@ -1599,7 +1636,7 @@ async function filterReviewedComplaints() {
         document.getElementById("rc-kpi-total").innerText = currentReviewedComplaints.length;
         document.getElementById("rc-kpi-approved").innerText = currentReviewedComplaints.filter(c => c.reviewStatus === 'APPROVED').length;
         document.getElementById("rc-kpi-corrected").innerText = currentReviewedComplaints.filter(c => c.reviewStatus === 'CORRECTED').length;
-        document.getElementById("rc-kpi-reanalyzed").innerText = currentReviewedComplaints.filter(c => c.reviewStatus === 'REANALYZED').length;
+        document.getElementById("rc-kpi-rejected").innerText = currentReviewedComplaints.filter(c => c.reviewStatus === 'REJECTED').length;
         
     } catch (e) {
         console.error("filterReviewedComplaints error", e);
@@ -1628,20 +1665,22 @@ function populateReviewedTable(data) {
         
         const aiProd = item.products ? item.products.join(", ") : item.primaryProduct;
         const finalProd = item.finalProduct || item.primaryProduct;
+        const isChanged = (item.reviewStatus === 'CORRECTED') ? '<span style="color:var(--turkcell-yellow);">Evet</span>' : '<span style="color:var(--turkcell-green);">Hayır</span>';
+        const notePreview = item.reviewNote ? (item.reviewNote.length > 30 ? item.reviewNote.substring(0, 30) + "..." : item.reviewNote) : "-";
         
         tr.innerHTML = `
-            <td><strong style="color: var(--turkcell-blue); cursor: pointer;" data-action="view-complaint" data-complaint-id="${item.id}">${item.id}</strong></td>
-            <td>${item.sourceProduct || '-'}</td>
-            <td>${aiProd}</td>
+            <td><strong style="color: var(--turkcell-blue); cursor: pointer;" onclick="openReviewedDetailModal('${item.id}')">${item.id}</strong></td>
             <td><strong>${finalProd}</strong></td>
             <td><div style="font-weight:600;">${item.mainCategory}</div><div style="font-size:0.75rem;">${item.subCategory}</div></td>
-            <td><span class="badge-sent ${item.urgency==='High'||item.urgency==='Critical'?'negative':'positive'}">${item.urgency}</span> / ${item.sentiment}</td>
-            <td>${item.confidence}</td>
+            <td>${item.sentiment}</td>
+            <td><span class="badge-sent ${item.urgency==='High'||item.urgency==='Critical'?'negative':'positive'}">${item.urgency}</span></td>
             <td><span style="color:${color}; font-weight:bold;">${item.reviewStatus}</span></td>
+            <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.reviewNote || ''}">${notePreview}</td>
             <td><div style="font-size:0.8rem;">${item.reviewedAt || '-'}</div></td>
             <td>${item.reviewedBy || '-'}</td>
-            <td style="display: flex; gap: 4px;">
-                <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.75rem;" data-action="view-history" data-complaint-id="${item.id}">Geçmiş</button>
+            <td><strong>${isChanged}</strong></td>
+            <td>
+                <button class="btn-icon" title="Detay" onclick="openReviewedDetailModal('${item.id}')">🔍</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -1694,7 +1733,7 @@ async function loadSocialProvidersStatus() {
         data.providers.forEach(p => {
             const isEnabled = p.enabled;
             const badgeClass = isEnabled ? (p.prototype ? "badge-prototype" : "badge-active") : "badge-disabled";
-            const statusText = isEnabled ? (p.prototype ? "Prototype Ready" : "Active") : "Disabled";
+            const statusText = isEnabled ? (p.prototype ? "Prototip Hazır" : "Aktif") : "Devre Dışı";
             
             let iconSvg = '';
             if (p.platform === "X") {
@@ -1723,9 +1762,9 @@ async function loadSocialProvidersStatus() {
                 `;
             }
 
-            const methodStr = p.prototype ? 'Free Web Discovery' : 'Resmi API';
+            const methodStr = p.prototype ? 'Ücretsiz Web Keşfi' : 'Resmî API';
             const statusStr = isEnabled ? (p.prototype ? 'Beklemede' : 'Aktif') : 'Devre Dışı';
-            const connStatus = isEnabled ? 'API Hazır' : 'Henüz yapılandırılmadı';
+            const connStatus = isEnabled ? 'Prototip Hazır' : 'Henüz yapılandırılmadı';
             
             grid.innerHTML += `
                 <div class="social-card">
@@ -1955,4 +1994,73 @@ function closeEnterpriseModal() {
         lastFocusedElement.focus();
         lastFocusedElement = null;
     }
+}
+
+async function openReviewedDetailModal(id) {
+    try {
+        const item = currentReviewedComplaints.find(c => c.id === id);
+        if (!item) return;
+
+        // Populate Content
+        document.getElementById("rd-content").innerText = item.maskedContent || item.rawContent || "";
+        document.getElementById("rd-source").innerText = item.source || "-";
+        document.getElementById("rd-date").innerText = item.createdAt || "-";
+        document.getElementById("rd-source-product").innerText = item.sourceProduct || "-";
+
+        // AI First Result (from originalAiResult or fallback to current fields)
+        const aiRes = item.originalAiResult || {};
+        document.getElementById("rd-ai-product").innerText = aiRes.primaryProduct || item.primaryProduct || "-";
+        document.getElementById("rd-ai-cat").innerText = aiRes.mainCategory || item.mainCategory || "-";
+        document.getElementById("rd-ai-subcat").innerText = aiRes.subCategory || item.subCategory || "-";
+        document.getElementById("rd-ai-sentiment").innerText = aiRes.sentiment || item.sentiment || "-";
+        document.getElementById("rd-ai-emotion").innerText = aiRes.emotion || item.emotion || "-";
+        document.getElementById("rd-ai-urgency").innerText = aiRes.urgency || item.urgency || "-";
+
+        // Final Expert Result
+        document.getElementById("rd-final-product").innerText = item.finalProduct || item.primaryProduct || "-";
+        document.getElementById("rd-final-cat").innerText = item.mainCategory || "-";
+        document.getElementById("rd-final-subcat").innerText = item.subCategory || "-";
+        document.getElementById("rd-final-sentiment").innerText = item.sentiment || "-";
+        document.getElementById("rd-final-emotion").innerText = item.emotion || "-";
+        document.getElementById("rd-final-urgency").innerText = item.urgency || "-";
+
+        // Review Info
+        const actionSpan = document.getElementById("rd-action");
+        actionSpan.innerText = item.reviewStatus === 'CORRECTED' ? 'Düzenlendi ve Onaylandı' : (item.reviewStatus === 'APPROVED' ? 'AI Onaylandı' : (item.reviewStatus === 'REJECTED' ? 'Reddedildi' : 'Bilinmeyen Aksiyon'));
+        document.getElementById("rd-status").innerText = item.reviewStatus || "-";
+        document.getElementById("rd-reviewer").innerText = item.reviewedBy || "-";
+        document.getElementById("rd-review-date").innerText = item.reviewedAt || "-";
+        document.getElementById("rd-note").innerText = item.reviewNote || "Not girilmemiş.";
+
+        // History Summary
+        const historyContainer = document.getElementById("rd-history-content");
+        historyContainer.innerHTML = "<div style='color: #6B7280; font-style: italic;'>Yükleniyor...</div>";
+        document.getElementById("modal-reviewed-detail").classList.remove("hidden");
+
+        const res = await fetch(`${API_BASE}/api/v1/complaints/${id}/review-history`);
+        if (res.ok) {
+            const history = await res.json();
+            if (history.length === 0) {
+                historyContainer.innerHTML = "<div style='color: #6B7280; font-style: italic;'>İnceleme geçmişi bulunamadı.</div>";
+            } else {
+                let hHtml = "";
+                history.forEach(h => {
+                    hHtml += `<div style="border-left: 3px solid #3B82F6; padding-left: 12px; margin-bottom: 12px;">
+                        <div style="font-size: 0.8rem; color: #6B7280; margin-bottom: 4px;">${h.reviewed_at} - ${h.reviewed_by}</div>
+                        <div style="font-weight: 600;">Aksiyon: ${h.action}</div>
+                        ${h.note ? `<div style="margin-top: 4px; font-style: italic; color: #4B5563;">"${h.note}"</div>` : ''}
+                    </div>`;
+                });
+                historyContainer.innerHTML = hHtml;
+            }
+        } else {
+            historyContainer.innerHTML = "<div style='color: #EF4444;'>Geçmiş yüklenemedi.</div>";
+        }
+    } catch (e) {
+        console.error("Error opening detail modal", e);
+    }
+}
+
+function closeReviewedDetailModal() {
+    document.getElementById("modal-reviewed-detail").classList.add("hidden");
 }

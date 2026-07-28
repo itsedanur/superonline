@@ -24,7 +24,7 @@ db = EnterpriseDatabase()
 provider_registry = ProviderRegistry()
 
 active_runs = {}
-ALLOWED_PRODUCTS = ["Fiber", "Superbox", "ADSL"]
+ALLOWED_PRODUCTS = ["Fiber", "Superbox", "ADSL", "DSL", "BiP", "TV+", "fizy", "Game+", "lifebox"]
 
 class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -91,6 +91,8 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_json_response(db.get_product_urgency(prod, include_legacy=inc_leg))
                 elif action == "accuracy":
                     self.send_json_response(db.get_product_accuracy(prod, include_legacy=inc_leg))
+                elif action == "analytics":
+                    self.send_json_response(db.get_product_analytics(prod, include_legacy=inc_leg))
                 elif action == "complaints":
                     complaints = db.get_all_complaints(product_filter=prod)
                     formatted = [self.format_complaint_dict(c) for c in complaints if inc_leg or not c.get("legacy_record")]
@@ -352,21 +354,38 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
             text = found["masked_content"] or found["raw_content"]
             new_res = ai_engine.analyze(text)
             
-            # Save the new result as REANALYZED
-            update_dict = {
+            # Save the new result and set to REVIEW_PENDING
+            with db.get_connection() as conn:
+                conn.execute("""
+                    UPDATE complaints SET 
+                        primary_product = ?,
+                        main_category = ?,
+                        sentiment = ?,
+                        urgency = ?,
+                        emotion = ?,
+                        review_status = 'REVIEW_PENDING'
+                    WHERE id = ?
+                """, (
+                    new_res["primaryProduct"],
+                    new_res["mainCategory"],
+                    new_res["sentiment"],
+                    new_res.get("urgency", "Medium"),
+                    new_res.get("emotion", "Nötr"),
+                    cid
+                ))
+                conn.commit()
+                
+            old_vals = {
+                "primaryProduct": found["primary_product"],
+                "mainCategory": found["main_category"],
+                "sentiment": found["sentiment"]
+            }
+            new_vals = {
                 "primaryProduct": new_res["primaryProduct"],
                 "mainCategory": new_res["mainCategory"],
-                "sentiment": new_res["sentiment"],
-                "urgency": new_res.get("urgency", "Medium"),
-                "emotion": new_res.get("emotion", "Nötr"),
-                "reviewNote": "Yeniden analiz yapıldı ve kaydedildi."
+                "sentiment": new_res["sentiment"]
             }
-            db.review_and_correct_complaint(cid, update_dict, reviewed_by="AI Engine")
-            # Update status to REANALYZED
-            with db.get_connection() as conn:
-                conn.execute("UPDATE complaints SET review_status = 'REANALYZED' WHERE id = ?", (cid,))
-                conn.commit()
-            db.add_review_history(cid, "REANALYZE", old_values={"primaryProduct": found["primary_product"]}, new_values={"primaryProduct": new_res["primaryProduct"]}, note="AI yeniden analizi yapıldı ve kaydedildi.")
+            db.add_review_history(cid, "REANALYZED", old_values=old_vals, new_values=new_vals, note="AI yeniden analizi yapıldı", reviewed_by="AI Engine")
 
             old_res = {
                 "primaryProduct": found["primary_product"],
@@ -378,6 +397,77 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
                 "message": "Yeniden analiz yapıldı ve kaydedildi.",
                 "oldResult": old_res,
                 "newResult": new_res
+            })
+
+        # POST /api/v1/social/x/prototype/preview
+        elif path == "/api/v1/social/x/prototype/preview":
+            x_provider = provider_registry.get_provider("X")
+            if not x_provider or not x_provider.is_enabled:
+                self.send_json_response({"error": "X Public Web Prototype devre dışı."}, status=403)
+                return
+            
+            brands = body.get("brands", ["BIP", "TV_PLUS", "FIZY", "GAME_PLUS", "LIFEBOX"])
+            max_results = body.get("max_results_per_query", 10)
+            
+            result = x_provider.fetch_contents(max_results=max_results, brands_to_search=brands)
+            
+            preview_items = []
+            duplicate_count = 0
+            new_count = 0
+            
+            if result["status"] == "PUBLIC_RESULTS_AVAILABLE":
+                for raw in result["raw_items"]:
+                    norm_content = x_provider.normalize_content(raw)
+                    db_status = db.save_social_content(norm_content, dry_run=True)
+                    if db_status in ["DUPLICATE_EXTERNAL_ID", "DUPLICATE_HASH"]:
+                        duplicate_count += 1
+                    else:
+                        new_count += 1
+                    
+                    import dataclasses
+                    preview_items.append({
+                        "normalized": dataclasses.asdict(norm_content),
+                        "db_status": db_status
+                    })
+            
+            self.send_json_response({
+                "access_status": result["status"],
+                "message": result["message"],
+                "scanned_queries": result["scanned_queries"],
+                "total_found": len(result["raw_items"]),
+                "unreadable_count": result.get("unreadable_count", 0),
+                "duplicate_count": duplicate_count,
+                "new_count": new_count,
+                "preview_items": preview_items
+            })
+
+        # POST /api/v1/social/x/prototype/import
+        elif path == "/api/v1/social/x/prototype/import":
+            x_provider = provider_registry.get_provider("X")
+            if not x_provider or not x_provider.is_enabled:
+                self.send_json_response({"error": "X Public Web Prototype devre dışı."}, status=403)
+                return
+                
+            items = body.get("items", [])
+            imported = 0
+            duplicates = 0
+            
+            from social_media.models import NormalizedSocialContent
+            for item in items:
+                # Reconstruct DTO
+                norm_data = item.get("normalized", {})
+                content = NormalizedSocialContent(**norm_data)
+                
+                db_status = db.save_social_content(content, dry_run=False)
+                if db_status == "INSERTED":
+                    imported += 1
+                else:
+                    duplicates += 1
+                    
+            self.send_json_response({
+                "imported": imported,
+                "duplicates": duplicates,
+                "message": f"{imported} yeni içerik aktarıldı. {duplicates} içerik atlandı."
             })
 
         else:
