@@ -26,6 +26,55 @@ provider_registry = ProviderRegistry()
 active_runs = {}
 ALLOWED_PRODUCTS = ["Fiber", "Superbox", "ADSL", "DSL", "BiP", "TV+", "fizy", "Game+", "lifebox"]
 
+
+def resolve_date_range(period, timezone=None):
+    from datetime import datetime, timedelta, timezone as dt_timezone
+    if not timezone:
+        from zoneinfo import ZoneInfo
+        timezone = ZoneInfo("Europe/Istanbul")
+    
+    now_local = datetime.now(timezone)
+    
+    if period == "ALL" or not period:
+        return None, None
+        
+    try:
+        if "," in period:
+            parts = period.split(",")
+            if len(parts) == 0 or not parts[0]: raise ValueError("Invalid Date")
+            d_from_str = parts[0]
+            d_to_str = parts[1] if len(parts) > 1 and parts[1] else d_from_str
+            local_start = datetime.strptime(d_from_str, "%Y-%m-%d").replace(tzinfo=timezone)
+            local_end = datetime.strptime(d_to_str, "%Y-%m-%d").replace(tzinfo=timezone) + timedelta(days=1)
+        elif period == "TODAY":
+            local_start = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+            local_end = local_start + timedelta(days=1)
+        elif period == "YESTERDAY":
+            local_start = (now_local - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+            local_end = local_start + timedelta(days=1)
+        elif period in ["WEEK", "LAST_7_DAYS"]:
+            local_start = (now_local - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
+            local_end = now_local + timedelta(days=1)
+        elif period in ["MONTH", "LAST_30_DAYS"]:
+            local_start = (now_local - timedelta(days=30)).replace(hour=0, minute=0, second=0, microsecond=0)
+            local_end = now_local + timedelta(days=1)
+        elif period == "THIS_WEEK":
+            start_of_week = now_local - timedelta(days=now_local.weekday())
+            local_start = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+            local_end = now_local + timedelta(days=1)
+        elif period == "THIS_MONTH":
+            local_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            local_end = now_local + timedelta(days=1)
+        else:
+            raise ValueError(f"Unknown period: {period}")
+            
+        utc_start = local_start.astimezone(dt_timezone.utc)
+        utc_end = local_end.astimezone(dt_timezone.utc)
+        
+        return utc_start.strftime("%Y-%m-%d %H:%M:%S"), utc_end.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception as e:
+        raise ValueError("Geçersiz Tarih Parametresi") from e
+
 class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
@@ -102,6 +151,35 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
         # GET /api/v1/review-queue
+        
+        elif path == "/api/v1/product-analytics":
+            query = urllib.parse.parse_qs(parsed_url.query)
+            product = query.get("product", ["ALL"])[0]
+            if not product or product == "ALL":
+                self.send_error(400, "Product parameter is required")
+                return
+            
+            date_range_val = query.get('date_range', ['ALL'])[0]
+            date_type_val = query.get('date_type', ['added'])[0]
+            
+            from zoneinfo import ZoneInfo
+            try:
+                d_start, d_end = resolve_date_range(date_range_val, timezone=ZoneInfo("Europe/Istanbul"))
+            except ValueError as e:
+                self.send_error(400, str(e))
+                return
+            
+            filters = {
+                "platform": query.get('platform', ['ALL'])[0],
+                "sentiment": query.get('sentiment', ['ALL'])[0],
+                "category": query.get('category', ['ALL'])[0],
+                "status": query.get('status', ['ALL'])[0],
+                "date_range": date_range_val
+            }
+            
+            data = db.get_product_analytics(product, filters, date_start=d_start, date_end=d_end, date_type=date_type_val)
+            self.send_json_response(data)
+
         elif path in ["/api/review-queue", "/api/v1/review-queue"]:
             prod = query.get("product", ["ALL"])[0]
             cat = query.get("category", ["ALL"])[0]
@@ -124,8 +202,14 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
             prod = query.get("product", ["ALL"])[0]
             status = query.get("status", ["ALL"])[0]
             date_range = query.get("date_range", ["ALL"])[0]
+            from zoneinfo import ZoneInfo
+            try:
+                d_start, d_end = resolve_date_range(date_range, timezone=ZoneInfo("Europe/Istanbul"))
+            except ValueError as e:
+                self.send_error(400, str(e))
+                return
 
-            reviewed_items = db.get_reviewed_complaints(product_filter=prod, status_filter=status, date_range=date_range)
+            reviewed_items = db.get_reviewed_complaints(product_filter=prod, status_filter=status, date_start=d_start, date_end=d_end)
             formatted = [self.format_complaint_dict(c) for c in reviewed_items]
             self.send_json_response(formatted)
 
@@ -159,7 +243,7 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json_response(history)
 
         # GET /api/v1/complaints/{id}
-        elif path.startswith("/api/v1/complaints/") or path.startswith("/api/complaints/"):
+        elif path.startswith("/api/v1/complaints/") and len(path.split("/")) == 5:
             cid = path.split("/")[-1].strip()
             complaints = db.get_all_complaints()
             found = next((c for c in complaints if c["id"] == cid), None)
@@ -167,25 +251,35 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_json_response({"error": f"Şikayet '{cid}' bulunamadı."}, status=404)
                 return
             self.send_json_response(self.format_complaint_dict(found))
-
         # GET /api/v1/complaints
         elif path in ["/api/complaints", "/api/v1/complaints"]:
-            prod_filter = query.get("product", ["ALL"])[0]
+            prod = query.get("product", ["ALL"])[0]
             date_range = query.get("date_range", ["ALL"])[0]
+            date_type_val = query.get("date_type", ["added"])[0]
             sort_order = query.get("sort", ["DESC"])[0]
-            platform_filter = query.get("platform", ["ALL"])[0]
-            content_type_filter = query.get("content_type", ["ALL"])[0]
+            platform = query.get("platform", ["ALL"])[0]
+            c_type = query.get("content_type", ["ALL"])[0]
+            
+            d_start, d_end = None, None
+            if date_range != "ALL":
+                from zoneinfo import ZoneInfo
+                try:
+                    d_start, d_end = resolve_date_range(date_range, timezone=ZoneInfo("Europe/Istanbul"))
+                except ValueError as e:
+                    self.send_error(400, str(e))
+                    return
 
             complaints = db.get_all_complaints(
-                product_filter=prod_filter, 
-                date_range=date_range, 
+                product_filter=prod, 
+                date_start=d_start,
+                date_end=d_end,
+                date_type=date_type_val,
                 sort_order=sort_order,
-                platform_filter=platform_filter,
-                content_type_filter=content_type_filter
+                platform_filter=platform,
+                content_type_filter=c_type
             )
             formatted = [self.format_complaint_dict(c) for c in complaints]
             self.send_json_response(formatted)
-
         # GET /api/v1/executive/summary
         elif path in ["/api/executive/summary", "/api/v1/executive/summary"]:
             exec_summary = db.get_executive_summary()
@@ -471,7 +565,7 @@ class SuperonlineRequestHandler(http.server.SimpleHTTPRequestHandler):
             })
 
         else:
-            self.send_error(404, "Endpoint Bulunamadı")
+            self.send_error(404, "Not Found")
 
     def read_json_body(self):
         content_length = int(self.headers.get('Content-Length', 0))

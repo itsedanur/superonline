@@ -59,3 +59,17 @@ screenshot_mobile.png
 screenshot_tablet.png
 screenshot_ui2_modal.png
 screenshot_ui4_*.png
+screenshot_*.png
+
+
+# Temporary patch and fix scripts
+patch_*.py
+fix_*.py
+analyze_*.py
+insert_*.py
+inject_*.py
+inspect_*.py
+print_where.py
+pipe_stderr.py
+check_db_dates.py
+

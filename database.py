@@ -471,11 +471,24 @@ class EnterpriseDatabase:
             rows = cursor.fetchall()
             return [dict(r) for r in rows]
 
-    def get_all_complaints(self, product_filter="ALL", date_range="ALL", sort_order="DESC", platform_filter="ALL", content_type_filter="ALL"):
+    def get_all_complaints(self, product_filter="ALL", date_range="ALL", sort_order="DESC", platform_filter="ALL", content_type_filter="ALL", date_start=None, date_end=None, date_type="added"):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             query = "SELECT * FROM complaints WHERE review_status != 'DELETED'"
             params = []
+
+            if date_type == "published":
+                date_column = "source_published_at"
+                query += f" AND {date_column} IS NOT NULL AND {date_column} != ''"
+            elif date_type == "reviewed":
+                date_column = "reviewed_at"
+            else:
+                date_column = "COALESCE(fetched_at, created_at)"
+
+            if date_start and date_end:
+                query += f" AND {date_column} >= ? AND {date_column} < ?"
+                params.extend([date_start, date_end])
+
             if product_filter != "ALL":
                 query += " AND (primary_product = ? OR products_json LIKE ?)"
                 params.extend([product_filter, f'%"{product_filter}"%'])
@@ -486,18 +499,11 @@ class EnterpriseDatabase:
                 query += " AND content_type = ?"
                 params.append(content_type_filter)
 
-            now = datetime.now()
-            if date_range == "TODAY":
-                query += " AND created_at >= ?"
-                params.append(f"{now.strftime('%Y-%m-%d')} 00:00:00")
-            elif date_range == "WEEK":
-                week_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
-                query += " AND created_at >= ?"
-                params.append(f"{week_ago} 00:00:00")
-            elif date_range == "MONTH":
-                month_ago = (now - timedelta(days=30)).strftime("%Y-%m-%d")
-                query += " AND created_at >= ?"
-                params.append(f"{month_ago} 00:00:00")
+            if date_start and date_end:
+                query += f" AND COALESCE(NULLIF(source_published_at, ''), fetched_at, created_at) >= ?"
+                params.append(date_start)
+                query += f" AND COALESCE(NULLIF(source_published_at, ''), fetched_at, created_at) < ?"
+                params.append(date_end)
 
             order_sql = "ASC" if str(sort_order).upper() == "ASC" else "DESC"
             query += f" ORDER BY created_at {order_sql}"
@@ -872,7 +878,7 @@ class EnterpriseDatabase:
                 results.append(item)
             return results
 
-    def get_review_queue(self, product_filter="ALL", category_filter="ALL", urgency_filter="ALL", sentiment_filter="ALL", search_term=None, preset=None):
+    def get_review_queue(self, product_filter="ALL", category_filter="ALL", urgency_filter="ALL", sentiment_filter="ALL", search_term=None, preset=None, date_start=None, date_end=None, date_column="COALESCE(source_published_at, fetched_at, created_at)"):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             query = """
@@ -930,7 +936,7 @@ class EnterpriseDatabase:
                 results.append(item)
             return results
 
-    def get_reviewed_complaints(self, product_filter="ALL", status_filter="ALL", date_range="ALL"):
+    def get_reviewed_complaints(self, product_filter="ALL", status_filter="ALL", date_start=None, date_end=None):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             query = """
@@ -947,18 +953,11 @@ class EnterpriseDatabase:
                 query += " AND review_status = ?"
                 params.append(status_filter)
 
-            now = datetime.now()
-            if date_range == "TODAY":
+            if date_start and date_end:
                 query += " AND reviewed_at >= ?"
-                params.append(f"{now.strftime('%Y-%m-%d')} 00:00:00")
-            elif date_range == "WEEK":
-                week_ago = (now - timedelta(days=7)).strftime("%Y-%m-%d")
-                query += " AND reviewed_at >= ?"
-                params.append(f"{week_ago} 00:00:00")
-            elif date_range == "MONTH":
-                month_ago = (now - timedelta(days=30)).strftime("%Y-%m-%d")
-                query += " AND reviewed_at >= ?"
-                params.append(f"{month_ago} 00:00:00")
+                params.append(date_start)
+                query += " AND reviewed_at < ?"
+                params.append(date_end)
 
             query += " ORDER BY reviewed_at DESC"
             cursor.execute(query, params)
@@ -1226,58 +1225,84 @@ class EnterpriseDatabase:
     def get_executive_summary(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            now = datetime.now()
-            today_str = now.strftime("%Y-%m-%d")
-            yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
             
-            d7_str = (now - timedelta(days=7)).strftime("%Y-%m-%d")
-            d14_str = (now - timedelta(days=14)).strftime("%Y-%m-%d")
-            d30_str = (now - timedelta(days=30)).strftime("%Y-%m-%d")
-            d60_str = (now - timedelta(days=60)).strftime("%Y-%m-%d")
+            from zoneinfo import ZoneInfo
+            from datetime import timezone
+            tz = ZoneInfo("Europe/Istanbul")
+            now_local = datetime.now(tz)
+            
+            # Helper to get UTC bounds for a local period
+            def get_bounds(days_offset_start, days_offset_end=None):
+                if days_offset_end is None:
+                    # Single day
+                    start = (now_local - timedelta(days=days_offset_start)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    end = start + timedelta(days=1)
+                else:
+                    # Range (e.g. last 7 days means [now-7d 00:00, now_local.day+1 00:00])
+                    # Actually, if we use offset, 0 is today.
+                    # Last 7 days = [today-7d, today+1d]
+                    start = (now_local - timedelta(days=days_offset_start)).replace(hour=0, minute=0, second=0, microsecond=0)
+                    end = (now_local - timedelta(days=days_offset_end)).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+                
+                return (
+                    start.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+                    end.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                )
+
+            t_start, t_end = get_bounds(0)
+            y_start, y_end = get_bounds(1)
+            
+            d7_start, d7_end = get_bounds(7, 0)
+            prev7_start, prev7_end = get_bounds(14, 8)
+            
+            d30_start, d30_end = get_bounds(30, 0)
+            prev30_start, prev30_end = get_bounds(60, 31)
 
             cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE review_status != 'DELETED'")
             total = cursor.fetchone()["cnt"]
 
+            date_col = "COALESCE(NULLIF(source_published_at, ''), fetched_at, created_at)"
+
             # 1. Daily comparison (Today vs Yesterday)
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) = ? AND review_status != 'DELETED'", (today_str,))
+            cursor.execute(f"SELECT COUNT(*) as cnt FROM complaints WHERE {date_col} >= ? AND {date_col} < ? AND review_status != 'DELETED'", (t_start, t_end))
             today_cnt = cursor.fetchone()["cnt"]
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) = ? AND review_status != 'DELETED'", (yesterday_str,))
+            cursor.execute(f"SELECT COUNT(*) as cnt FROM complaints WHERE {date_col} >= ? AND {date_col} < ? AND review_status != 'DELETED'", (y_start, y_end))
             yest_cnt = cursor.fetchone()["cnt"]
             
             daily_metrics = self.calculate_period_change(today_cnt, yest_cnt)
             daily_metrics.update({
-                "period_start": today_str,
-                "period_end": today_str,
-                "comparison_start": yesterday_str,
-                "comparison_end": yesterday_str
+                "period_start": (now_local).strftime("%Y-%m-%d"),
+                "period_end": (now_local).strftime("%Y-%m-%d"),
+                "comparison_start": (now_local - timedelta(days=1)).strftime("%Y-%m-%d"),
+                "comparison_end": (now_local - timedelta(days=1)).strftime("%Y-%m-%d")
             })
 
             # 2. Weekly comparison (Last 7d vs Prev 7d)
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? AND review_status != 'DELETED'", (d7_str,))
+            cursor.execute(f"SELECT COUNT(*) as cnt FROM complaints WHERE {date_col} >= ? AND {date_col} < ? AND review_status != 'DELETED'", (d7_start, d7_end))
             w1_cnt = cursor.fetchone()["cnt"]
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? AND SUBSTR(COALESCE(source_published_at, created_at), 1, 10) < ? AND review_status != 'DELETED'", (d14_str, d7_str))
+            cursor.execute(f"SELECT COUNT(*) as cnt FROM complaints WHERE {date_col} >= ? AND {date_col} < ? AND review_status != 'DELETED'", (prev7_start, prev7_end))
             w2_cnt = cursor.fetchone()["cnt"]
 
             weekly_metrics = self.calculate_period_change(w1_cnt, w2_cnt)
             weekly_metrics.update({
-                "period_start": d7_str,
-                "period_end": today_str,
-                "comparison_start": d14_str,
-                "comparison_end": d7_str
+                "period_start": (now_local - timedelta(days=7)).strftime("%Y-%m-%d"),
+                "period_end": (now_local).strftime("%Y-%m-%d"),
+                "comparison_start": (now_local - timedelta(days=14)).strftime("%Y-%m-%d"),
+                "comparison_end": (now_local - timedelta(days=7)).strftime("%Y-%m-%d")
             })
 
             # 3. Monthly comparison (Last 30d vs Prev 30d)
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? AND review_status != 'DELETED'", (d30_str,))
+            cursor.execute(f"SELECT COUNT(*) as cnt FROM complaints WHERE {date_col} >= ? AND {date_col} < ? AND review_status != 'DELETED'", (d30_start, d30_end))
             m1_cnt = cursor.fetchone()["cnt"]
-            cursor.execute("SELECT COUNT(*) as cnt FROM complaints WHERE SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? AND SUBSTR(COALESCE(source_published_at, created_at), 1, 10) < ? AND review_status != 'DELETED'", (d60_str, d30_str))
+            cursor.execute(f"SELECT COUNT(*) as cnt FROM complaints WHERE {date_col} >= ? AND {date_col} < ? AND review_status != 'DELETED'", (prev30_start, prev30_end))
             m2_cnt = cursor.fetchone()["cnt"]
 
             monthly_metrics = self.calculate_period_change(m1_cnt, m2_cnt)
             monthly_metrics.update({
-                "period_start": d30_str,
-                "period_end": today_str,
-                "comparison_start": d60_str,
-                "comparison_end": d30_str
+                "period_start": (now_local - timedelta(days=30)).strftime("%Y-%m-%d"),
+                "period_end": (now_local).strftime("%Y-%m-%d"),
+                "comparison_start": (now_local - timedelta(days=60)).strftime("%Y-%m-%d"),
+                "comparison_end": (now_local - timedelta(days=31)).strftime("%Y-%m-%d")
             })
 
             # Critical complaints ratio
@@ -1335,17 +1360,17 @@ class EnterpriseDatabase:
             }
 
             # 4. Fastest Rising Categories (Minimum sample threshold: recent_cnt + prev_cnt >= 5)
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT sub_category,
-                       SUM(CASE WHEN SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? THEN 1 ELSE 0 END) as recent_cnt,
-                       SUM(CASE WHEN SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ? AND SUBSTR(COALESCE(source_published_at, created_at), 1, 10) < ? THEN 1 ELSE 0 END) as prev_cnt
+                       SUM(CASE WHEN {date_col} >= ? THEN 1 ELSE 0 END) as recent_cnt,
+                       SUM(CASE WHEN {date_col} >= ? AND {date_col} < ? THEN 1 ELSE 0 END) as prev_cnt
                 FROM complaints
                 WHERE review_status != 'DELETED' AND sub_category IS NOT NULL
                 GROUP BY sub_category
                 HAVING (recent_cnt + prev_cnt) >= 5 AND recent_cnt > 0
                 ORDER BY (recent_cnt - prev_cnt) DESC
                 LIMIT 5
-            """, (d7_str, d14_str, d7_str))
+            """, (d7_start, prev7_start, d7_start))
             rising_rows = cursor.fetchall()
 
             fastest_rising = []
@@ -1386,13 +1411,22 @@ class EnterpriseDatabase:
     def get_executive_trends(self, days=30):
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            now = datetime.now()
-            start_date = (now - timedelta(days=days)).strftime("%Y-%m-%d")
-            end_date = now.strftime("%Y-%m-%d")
             
-            cursor.execute("""
+            from zoneinfo import ZoneInfo
+            from datetime import timezone
+            tz = ZoneInfo("Europe/Istanbul")
+            now_local = datetime.now(tz)
+            
+            start_local = (now_local - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
+            start_utc = start_local.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            
+            date_col = "COALESCE(NULLIF(source_published_at, ''), fetched_at, created_at)"
+            # Use +3 hours offset to group UTC dates by Turkey's timezone (UTC+3)
+            local_day_expr = f"SUBSTR(datetime({date_col}, '+3 hours'), 1, 10)"
+
+            cursor.execute(f"""
                 SELECT 
-                    SUBSTR(COALESCE(source_published_at, created_at), 1, 10) as day,
+                    {local_day_expr} as day,
                     SUM(CASE WHEN COALESCE(final_product, primary_product) = 'Fiber' THEN 1 ELSE 0 END) as fiber_cnt,
                     SUM(CASE WHEN COALESCE(final_product, primary_product) = 'Superbox' THEN 1 ELSE 0 END) as superbox_cnt,
                     SUM(CASE WHEN COALESCE(final_product, primary_product) = 'ADSL' THEN 1 ELSE 0 END) as adsl_cnt,
@@ -1402,10 +1436,10 @@ class EnterpriseDatabase:
                     SUM(CASE WHEN urgency IN ('High', 'Critical') THEN 1 ELSE 0 END) as critical_cnt,
                     COUNT(*) as total
                 FROM complaints
-                WHERE review_status != 'DELETED' AND SUBSTR(COALESCE(source_published_at, created_at), 1, 10) >= ?
-                GROUP BY SUBSTR(COALESCE(source_published_at, created_at), 1, 10)
+                WHERE review_status != 'DELETED' AND {date_col} >= ?
+                GROUP BY {local_day_expr}
                 ORDER BY day ASC
-            """, (start_date,))
+            """, (start_utc,))
             
             rows = cursor.fetchall()
             series = [dict(r) for r in rows]
@@ -1417,8 +1451,8 @@ class EnterpriseDatabase:
             return {
                 "series": series,
                 "coverage_metadata": {
-                    "start_date": start_date,
-                    "end_date": end_date,
+                    "start_date": start_local.strftime("%Y-%m-%d"),
+                    "end_date": now_local.strftime("%Y-%m-%d"),
                     "days_with_data_count": days_with_data,
                     "total_timepoints_count": days,
                     "is_sparse": is_sparse,
@@ -1432,6 +1466,141 @@ class EnterpriseDatabase:
             cursor.execute("SELECT MAX(source_published_at) as max_date FROM complaints WHERE source_published_at IS NOT NULL AND source_published_at != ''")
             row = cursor.fetchone()
             return row["max_date"] if row and row["max_date"] else None
+
+
+    def get_product_analytics(self, product, filters, date_start=None, date_end=None, date_type="added"):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Base Where Clause
+            where_clauses = ["(final_product = ? OR primary_product = ?)"]
+            params = [product, product]
+            
+            if filters.get("platform") and filters["platform"] != "ALL":
+                where_clauses.append("platform = ?")
+                params.append(filters["platform"])
+            if filters.get("sentiment") and filters["sentiment"] != "ALL":
+                where_clauses.append("sentiment = ?")
+                params.append(filters["sentiment"])
+            if filters.get("category") and filters["category"] != "ALL":
+                where_clauses.append("main_category = ?")
+                params.append(filters["category"])
+            if filters.get("status") and filters["status"] != "ALL":
+                if filters["status"] == "OPEN":
+                    where_clauses.append("case_status != 'CLOSED'")
+                elif filters["status"] == "CLOSED":
+                    where_clauses.append("case_status = 'CLOSED'")
+
+            # Date Column Logic
+            if date_type == "published":
+                date_column = "source_published_at"
+                where_clauses.append(f"{date_column} IS NOT NULL AND {date_column} != ''")
+            elif date_type == "reviewed":
+                date_column = "reviewed_at"
+            else:
+                date_column = "COALESCE(fetched_at, created_at)"
+
+            if date_start and date_end:
+                where_clauses.append(f"{date_column} >= ?")
+                params.append(date_start)
+                where_clauses.append(f"{date_column} < ?")
+                params.append(date_end)
+                
+            where_str = " AND ".join(where_clauses)
+            
+            # 1. KPIs
+            # Total records
+            cursor.execute(f"SELECT COUNT(*) as c FROM complaints WHERE {where_str}", params)
+            total = cursor.fetchone()["c"]
+            
+            # Closed vs Open
+            cursor.execute(f"SELECT COUNT(*) as c FROM complaints WHERE {where_str} AND case_status != 'CLOSED'", params)
+            open_count = cursor.fetchone()["c"]
+            cursor.execute(f"SELECT COUNT(*) as c FROM complaints WHERE {where_str} AND case_status = 'CLOSED'", params)
+            closed_count = cursor.fetchone()["c"]
+            
+            # AI Approved (APPROVED) vs Expert Corrected (CORRECTED)
+            cursor.execute(f"SELECT COUNT(*) as c FROM complaints WHERE {where_str} AND needs_human_review = 0 AND review_status = 'APPROVED'", params)
+            ai_approved = cursor.fetchone()["c"]
+            cursor.execute(f"SELECT COUNT(*) as c FROM complaints WHERE {where_str} AND review_status = 'CORRECTED'", params)
+            expert_corrected = cursor.fetchone()["c"]
+            
+            # Missing Publish Date Count (same filters, but without date conditions)
+            base_where_clauses = [w for w in where_clauses if "source_published_at" not in w and "fetched_at" not in w and "reviewed_at" not in w and "created_at" not in w]
+            # Actually, to be safe, just take the first clauses (product, platform, sentiment, category, status)
+            # which are at the beginning of where_clauses.
+            base_where_clauses = where_clauses[:len(where_clauses)-3] if date_start else where_clauses[:len(where_clauses)-1] if date_type == "published" else where_clauses
+            # Just do a fresh build for missing date count
+            base_clauses = ["(final_product = ? OR primary_product = ?)"]
+            b_params = [product, product]
+            if filters.get("platform") and filters["platform"] != "ALL":
+                base_clauses.append("platform = ?")
+                b_params.append(filters["platform"])
+            if filters.get("status") and filters["status"] != "ALL":
+                if filters["status"] == "OPEN": base_clauses.append("case_status != 'CLOSED'")
+                elif filters["status"] == "CLOSED": base_clauses.append("case_status = 'CLOSED'")
+            b_where_str = " AND ".join(base_clauses)
+
+            cursor.execute(f"SELECT COUNT(*) as c FROM complaints WHERE {b_where_str} AND (source_published_at IS NULL OR source_published_at = '')", b_params)
+            missing_publish_date_count = cursor.fetchone()["c"]
+            
+            # Times (first_response_at - created_at) vs (closed_at - created_at)
+            # SQLite julianday returns difference in days, multiply by 24 for hours
+            cursor.execute(f"""
+                SELECT 
+                    AVG((julianday(first_response_at) - julianday(created_at)) * 24) as avg_first_response_hours,
+                    AVG((julianday(closed_at) - julianday(created_at)) * 24) as avg_resolution_hours
+                FROM complaints 
+                WHERE {where_str}
+            """, params)
+            times = cursor.fetchone()
+            avg_fr = round(times["avg_first_response_hours"], 1) if times and times["avg_first_response_hours"] else None
+            avg_rt = round(times["avg_resolution_hours"], 1) if times and times["avg_resolution_hours"] else None
+            
+            # 2. Charts
+            # Content Type (Bar)
+            cursor.execute(f"SELECT content_type, COUNT(*) as c FROM complaints WHERE {where_str} GROUP BY content_type ORDER BY c DESC", params)
+            content_type_data = [dict(r) for r in cursor.fetchall()]
+            
+            # Platform (Donut)
+            cursor.execute(f"SELECT platform, COUNT(*) as c FROM complaints WHERE {where_str} GROUP BY platform ORDER BY c DESC", params)
+            platform_data = [dict(r) for r in cursor.fetchall()]
+            
+            # Topic (Donut)
+            cursor.execute(f"SELECT main_category, COUNT(*) as c FROM complaints WHERE {where_str} GROUP BY main_category ORDER BY c DESC", params)
+            topic_data = [dict(r) for r in cursor.fetchall()]
+            
+            # 3. Recent 20 Records
+            cursor.execute(f"""
+                SELECT id, created_at as date, platform, final_product, primary_product, main_category, sub_category, sentiment, title, case_status, review_status
+                FROM complaints 
+                WHERE {where_str} 
+                ORDER BY created_at DESC 
+                LIMIT 20
+            """, params)
+            recent_records = [dict(r) for r in cursor.fetchall()]
+            
+            return {
+                "kpis": {
+                    "total": total,
+                    "closed": closed_count,
+                    "open": open_count,
+                    "ai_approved": ai_approved,
+                    "expert_corrected": expert_corrected,
+                    "avg_first_response_hours": avg_fr,
+                    "avg_resolution_hours": avg_rt,
+                    "csat_score": None, # Future enhancement
+                    "csat_participation": None,
+                    "missing_publish_date_count": missing_publish_date_count
+                },
+                "charts": {
+                    "content_type": content_type_data,
+                    "platform": platform_data,
+                    "topic": topic_data
+                },
+                "recent_records": recent_records
+            }
+
 
 if __name__ == "__main__":
     db = EnterpriseDatabase()

@@ -354,7 +354,7 @@ body[data-active-tab="social-providers"] #global-header-actions {
 .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .chart-header h3 { font-family: var(--font-heading); font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
 .info-badge { font-size: 0.7rem; color: var(--text-muted); background: #F1F5F9; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border-color); }
-.chart-container { position: relative; height: 260px; width: 100%; }
+.chart-container { position: relative; height: 100%; max-height: 300px; min-height: 260px; width: 100%; }
 
 /* Table Styles */
 .table-card { padding: 18px; }
@@ -781,4 +781,105 @@ textarea:focus { border-color: var(--turkcell-blue); }
     border-top-color: currentColor;
     animation: spinner 0.6s linear infinite;
     vertical-align: middle;
+}
+\n
+/* UI-5 EXECUTIVE PRODUCT ANALYTICS STYLES */
+.product-tabs-wrapper::-webkit-scrollbar {
+    height: 6px;
+}
+.product-tabs-wrapper::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+}
+.product-tab-btn {
+    padding: 8px 16px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+.product-tab-btn:hover {
+    color: var(--text-color);
+    background: rgba(255,255,255,0.05);
+}
+.product-tab-btn.active {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--turkcell-blue);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+.enterprise-select {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    background-color: rgba(15, 23, 42, 0.4);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.enterprise-select:focus {
+    border-color: var(--turkcell-blue);
+}
+
+/* KPI Card Colors */
+.kpi-card-blue .kpi-header { color: var(--turkcell-blue); }
+.kpi-card-orange .kpi-header { color: var(--turkcell-yellow); }
+.kpi-card-green .kpi-header { color: var(--turkcell-green); }
+.kpi-card-indigo .kpi-header { color: var(--turkcell-indigo); }
+.kpi-card-purple .kpi-header { color: #A855F7; }
+.kpi-card-gray .kpi-header { color: #94A3B8; }
+.kpi-card-neutral .kpi-header { color: #64748B; }
+
+.kpi-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+.kpi-header i { width: 18px; height: 18px; }
+.kpi-title { flex: 1; }
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-color);
+    line-height: 1;
+    margin-bottom: 8px;
+}
+.kpi-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+\n
+/* UI-6 CORPORATE LINK STYLES */
+.corporate-link {
+    color: var(--turkcell-blue);
+    text-decoration: none;
+    position: relative;
+    transition: color 0.2s;
+    outline: none;
+}
+.corporate-link:hover {
+    color: #2563EB;
+}
+.corporate-link:hover::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -2px;
+    height: 1px;
+    background-color: currentColor;
+}
+.corporate-link:focus-visible {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+    border-radius: 2px;
 }

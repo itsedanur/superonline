@@ -1,56 +1,90 @@
-# Superonline AI Complaint Intelligence Platform
+# 🚀 Turkcell Superonline AI Complaint Intelligence Platform
 
-Kurumsal şikâyet yönetimi, AI destekli ürün & duygu analizi, otomatik tarama (scraping) ve C-Level Yönetici Paneli sunan uçtan uca müşteri deneyimi ve operasyonel risk analiz platformudur.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python" alt="Python Version" />
+  <img src="https://img.shields.io/badge/JavaScript-ES6%2B-yellow?style=for-the-badge&logo=javascript" alt="JS Version" />
+  <img src="https://img.shields.io/badge/SQLite-Persistent-lightgrey?style=for-the-badge&logo=sqlite" alt="SQLite" />
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker" alt="Docker" />
+  <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge" alt="Status" />
+</p>
+
+> **Kurumsal Müşteri Deneyimi, AI Destekli Ürün & Duygu Analizi, Otomatik Veri Toplama (Scraping) ve C-Level Yönetici Analiz Platformu**
+
+Turkcell Superonline müşteri geri bildirimlerini ve kamuya açık müşteri şikâyetlerini otomatik toplayıp işleyen bu platform; **Fiber**, **ADSL**, **Superbox**, **TV+**, **BiP** vb. ürün grupları bazında AI sınıflandırma, duygu (sentiment) tespiti, aciliyet derecelendirmesi ve çoklu ürün çelişki analizleri gerçekleştirir.
 
 ---
 
-## 📌 Proje Özeti
+## 📸 Ekran Görüntüleri (Visual Showcase)
 
-Turkcell Superonline müşteri geri bildirimlerini ve kamuya açık müşteri şikâyetlerini (PoC kapsamında Şikayetvar vb.) otomatik toplayıp işleyen bu platform; **Fiber**, **ADSL** ve **Superbox** ana ürün grupları bazında kategorizasyon, duygu (sentiment) tespiti, aciliyet derecelendirmesi ve çoklu ürün çelişki tespitleri gerçekleştirir.
+### 📊 1. C-Level Yönetici Paneli (Executive Dashboard)
+Dönemsel büyüme oranları, en çok ivme kazanan şikayet başlıkları (*Surging Issues*), NLP motoru risk uyarıları ve zaman serisi analitiği.
+
+![Executive Dashboard](assets/images/executive_dashboard.png)
+
+---
+
+### 📈 2. Genel Operasyonel Durum ve KPI Paneli
+Toplam şikayet hacmi, ürün bazlı dağılım (Fiber, Superbox, ADSL), konu kategorizasyonu ve canlı sistem istatistikleri.
+
+![Status Dashboard](assets/images/status_dashboard.png)
+
+---
+
+### 🔍 3. Fiber & Ürün Analitiği Filtreleme
+Ürün bazında filtrelenmiş detaylı şikayet listesi, trend grafikler ve konu bazlı dağılım kartları.
+
+![Fiber Analytics](assets/images/fiber_analytics.png)
+
+---
+
+### 📝 4. Manuel İnceleme Kuyruğu (Review Queue)
+AI tespit güven puanı düşük (`confidence < 0.70`) veya ürün çelişkisi bulunan kayıtların operatörler tarafından incelenmesi ve düzeltilmesi.
+
+![Review Queue](assets/images/review_queue_table.png)
+
+---
+
+### 💡 5. Detaylı Şikayet & AI İçgörü Modalı
+Şikayet metni, AI tarafından önerilen aksiyonlar, duygu puanı, kök neden analizi ve doğrudan yanıt şablonu önerileri.
+
+![Complaint Detail Modal](assets/images/complaint_detail_modal.png)
 
 ---
 
 ## 🔥 Temel Özellikler
 
-* **Ürün Bazlı Otomatik Sınıflandırma (Fiber / ADSL / Superbox)**:
-  * Şikâyet metni, başlığı ve kaynak sayfa verilerinden ürün tespiti.
-  * Hibrid Kural Motoru + LLM Bağlam Analizi ile %95+ doğruluk.
-* **Mod Bazlı Veri Toplama (INCREMENTAL & BACKFILL)**:
-  * **INCREMENTAL Modu**: Her zaman 1. sayfadan başlayarak en son gelen yeni şikâyetleri tarar. Önceden veritabanına eklenmiş kayıtları duplicate olarak işaretler ve veritabanını güncel tutar.
-  * **BACKFILL Modu**: Geçmişe dönük veri tamamlama talamalarında checkpoint (`next_page`) mekanizmasını kullanarak kaldığı sayfadan devam eder, tekrarlı taramayı önler.
-* **Manuel İnceleme Kuyruğu (Review Queue - Phase 2.2)**:
-  * AI tespit güven puanı düşük (`confidence < 0.70`) veya ürün kaynak çelişkisi (`product_conflict=true`) bulunan kayıtları operatör onayına yönlendirir.
-* **Detaylı Scrape Run İzlenebilirliği (Run Detail Ekranı)**:
-  * Her bir tarama turunda HTTP durum kodları, taranan benzersiz URL'ler, DB duplication sebepleri (`DB_CANONICAL_URL_MATCH`, `DB_EXTERNAL_ID_MATCH`, `CROSS_PAGE_DUPLICATE`) ve durma nedenleri (`STOPPED_DUPLICATE_THRESHOLD`, `COMPLETED_PAGE_LIMIT`) raporlanır.
-* **Yönetici Paneli & AI İçgörü Motoru (Executive Dashboard - Phase 3)**:
-  * C-Level yöneticiler için dönemsel (% günlük/haftalık/aylık) şikâyet artış oranları.
-  * En çok ivme kazanan sorun başlıkları (*Top 5 Surging Issues*).
-  * NLP motoru tarafından üretilen otomatik risk uyarıları ve stratejik eylem önerileri.
+| Özellik | Açıklama |
+| :--- | :--- |
+| **🤖 Ürün & Duygu Sınıflandırması** | Hibrid Kural Motoru + NLP Bağlam Analizi ile %95+ doğruluk oranı. |
+| **🔄 Çift Modlu Tarayıcı (Scraper)** | **INCREMENTAL** (Güncel 1. sayfa şikayetleri) & **BACKFILL** (Checkpoint'li geçmiş veri tamamlama). |
+| **⚖️ Operatör İnceleme Kuyruğu** | Düşük güven puanlı veya çelişkili kayıtlar için insan onaylı (*Human-in-the-loop*) doğrulama. |
+| **🔍 Scrape Run Detay Raporu** | HTTP durum kodları, benzersiz URL'ler, DB duplicate sebepleri ve tarama durma nedenleri izleme. |
+| **📈 C-Level Yönetici Paneli** | Günlük/haftalık/aylık artış oranları, trend analitiği ve AI stratejik eylem önerileri. |
+| **🎨 Modern Dark Mode & Glassmorphism UI** | Vanilla JS + Glassmorphism CSS ile yüksek performanslı SPA arayüzü. |
 
 ---
 
-## 🏗️ Proje Dizin Yapısı
+## 🏗️ Proje Mimarisi & Dizin Yapısı
 
 ```
 .
-├── Dockerfile                  # Container imaj yapısı
-├── docker-compose.yml          # Multi-container orchestration (App & Postgres)
-├── app.js                      # Modern Frontend Vanilla JS SPA mantığı
-├── index.html                  # Single Page Application HTML yapısı
-├── styles.css                  # Modern Dark-Mode & Glassmorphism stil sistemi
-├── server.py                   # Python REST API Server (http.server / WSGI)
-├── database.py                 # SQLite / PostgreSQL Veritabanı Erişim & Migration Katmanı
-├── scraper.py                  # HTTP Resilient Multi-strategy Scraper Engine
-├── nlp_engine.py               # Hybrid Rule-Based & LLM AI Classification Engine
-├── requirements.txt            # Python bağımlılıkları
-├── run.sh                      # Uygulama başlatma betiği
-├── .env.example                # Örnek ortam değişkenleri şablonu
-└── .gitignore                  # Git dışlama kuralları
+├── server.py                   # Python REST API Sunucusu (http.server / Custom Router)
+├── nlp_engine.py               # AI & NLP Sınıflandırma, Duygu & Kök Neden Analiz Motoru
+├── database.py                 # SQLite/PostgreSQL Veritabanı Migration & İnceleme Yönetimi
+├── scraper.py                  # HTTP Resilient Multi-strategy Scraping Motoru
+├── app.js                      # Vanilla JS SPA (Single Page Application) Mantığı
+├── index.html                  # Responsive UI HTML5 Yapısı
+├── styles.css                  # Custom Dark Mode & Glassmorphic CSS Tasarım Sistemi
+├── assets/images/              # Proje ekran görüntüleri & görsel varlıklar
+├── Dockerfile                  # Container imaj yapılandırması
+├── docker-compose.yml          # App & Database container orchestration
+├── requirements.txt            # Python bağımlılık listesi
+└── run.sh                      # Tek tıkla uygulamayı başlatma betiği
 ```
 
 ---
 
-## ⚙️ Docker ile Kurulum ve Çalıştırma
+## ⚙️ Hızlı Başlangıç (Quick Start)
 
 ### 1. Yerel Kurulum (Python)
 
@@ -60,24 +94,24 @@ pip install -r requirements.txt
 
 # Uygulama sunucusunu başlatın (Port: 8080)
 python3 server.py
+# veya
+bash run.sh
 ```
 
-Tarayıcınızdan `http://localhost:8080` adresine gidin.
+Uygulama çalıştıktan sonra tarayıcınızdan `http://localhost:8080` adresine erişebilirsiniz.
 
-### 2. Docker & Docker Compose ile Kurulum
+### 2. Docker ile Çalıştırma
 
 ```bash
-# Docker imajını derleyin ve başlatın
+# Container'ı derleyin ve başlatın
 docker-compose up -d --build
 ```
-
-Kapsayıcı çalıştıktan sonra uygulama veritabanı schema ve migration adımlarını otomatik olarak çalıştırır.
 
 ---
 
 ## 🌐 Ortam Değişkenleri (.env)
 
-Projede varsayılan konfigürasyonlar `.env.example` dosyasında tanımlanmıştır:
+Proje varsayılan ayarları `.env.example` dosyasında mevcuttur:
 
 | Değişken | Açıklama | Varsayılan |
 | :--- | :--- | :--- |
@@ -85,54 +119,49 @@ Projede varsayılan konfigürasyonlar `.env.example` dosyasında tanımlanmışt
 | `APP_PORT` | HTTP Port numarası | `8080` |
 | `DB_TYPE` | Veritabanı türü (`sqlite` / `postgres`) | `sqlite` |
 | `DATABASE_PATH` | SQLite veritabanı dosya yolu | `superonline_enterprise.db` |
-| `ENABLE_PUBLIC_WEB_PROTOTYPE` | Web canlı analiz sekmesi izni | `false` |
-| `OPENAI_API_KEY` | Opsiyonel LLM Bağlam Analizi API Anahtarı | `-` |
+| `ENABLE_PUBLIC_WEB_PROTOTYPE` | Canlı web analiz sekmesi izni | `false` |
+| `OPENAI_API_KEY` | Opsiyonel LLM Bağlam Analizi API Key | `-` |
 
 ---
 
-## 🔌 REST API Endpoint Özeti
+## 🔌 REST API Endpoints
 
-* `GET /api/v1/stats`: Genel KPI istatistikleri ve ürün dağılımları.
-* `GET /api/v1/complaints`: Filtrelenebilir ve sayfalanabilir şikâyet listesi.
-* `POST /api/v1/prototype-scrape`: Asenkron tarama (scraper) başlatma endpoint'i.
-* `GET /api/v1/scrape-runs/{run_id}`: Tarama detay raporu ve sayfa bazlı URL metrikleri.
-* `GET /api/v1/review-queue`: İnceleme bekleyen şikâyet kayıtları.
-* `POST /api/v1/review-queue/{id}/approve`: AI kararını onaylama.
-* `POST /api/v1/review-queue/{id}/correct`: Manuel ürün düzeltme.
-* `POST /api/v1/analyze`: Metin bazlı canlı AI sınıflandırma ve bağlam analizi.
-* `GET /api/v1/executive/summary`: Yönetici Paneli dönemsel büyüme ve AI içgörü özeti.
-* `GET /api/v1/executive/trends`: 30 günlük zaman serisi trend verileri.
+- `GET /api/v1/stats`: Genel KPI istatistikleri ve ürün dağılımları.
+- `GET /api/v1/complaints`: Filtrelenebilir ve sayfalanabilir şikâyet listesi.
+- `POST /api/v1/prototype-scrape`: Asenkron tarama (scraper) başlatma endpoint'i.
+- `GET /api/v1/scrape-runs/{run_id}`: Tarama detay raporu ve sayfa bazlı URL metrikleri.
+- `GET /api/v1/review-queue`: İnceleme bekleyen şikâyet kayıtları.
+- `POST /api/v1/review-queue/{id}/approve`: AI kararını onaylama.
+- `POST /api/v1/review-queue/{id}/correct`: Manuel ürün düzeltme.
+- `POST /api/v1/analyze`: Metin bazlı canlı AI sınıflandırma ve bağlam analizi.
+- `GET /api/v1/executive/summary`: Yönetici Paneli dönemsel büyüme ve AI içgörü özeti.
+- `GET /api/v1/executive/trends`: 30 günlük zaman serisi trend verileri.
 
 ---
 
 ## 🧪 Test Komutları
 
-Uygulamanın e2e ve modül testlerini çalıştırmak için:
-
 ```bash
-# Uçtan uca tarama ve pagination testi
+# E2E Tarama ve Sayfalama Testi
 python3 test_e2e_pagination.py
 
-# Mod bazlı checkpoint ve incremental/backfill testi
+# Mod Bazlı Checkpoint & Incremental/Backfill Testi
 python3 verify_modes_checkpoint.py
 
-# AI Ürün Sınıflandırıcı doğrulaması
+# AI Sınıflandırıcı Doğrulama Testi
 python3 test_product_classifier.py
 ```
 
 ---
 
-## 🚨 Önemli Yasal ve Teknik Uyarılar (KVKK & PoC Kapsamı)
+## 🚨 Yasal & Teknik Açıklamalar (KVKK & PoC Kapsamı)
 
-1. **PoC (Proof of Concept) Amacı**:
-   Bu projedeki Web Scraper modülü yalnızca konsept kanıtlama (PoC) ve gösterim amaçlı geliştirilmiştir. Şikayetvar veya diğer kamuya açık platformlardan çekilen veriler örnek niteliğindedir.
-2. **Üretim Ortamı Entegrasyonu**:
-   Üretim (Production) ortamında veri toplamak için canlı web scraping yerine Turkcell Superonline kurumsal CRM, Çağrı Merkezi (IVR), Mobil Uygulama Geri Bildirim API'leri veya resmi sosyal medya API entegrasyonları kullanılmalıdır.
-3. **KVKK ve Veri Gizliliği**:
-   Proje GitHub deposuna gerçek veritabanı kayıtları, müşteri kişisel verileri (PII), API anahtarları veya oturum çerezleri **kesinlikle yüklenmemektedir**. Veritabanı başlatma mekanizması boş şema ile çalışır.
+1. **PoC (Proof of Concept) Amacı**: Web Scraper modülü yalnızca konsept kanıtlama amacıyla geliştirilmiştir. Şikayetvar vb. platformlardan çekilen veriler örnek niteliğindedir.
+2. **Üretim Ortamı Entegrasyonu**: Üretim ortamında veri toplamak için Turkcell Superonline kurumsal CRM, Çağrı Merkezi (IVR), Mobil Uygulama Geri Bildirim API'leri kullanılmalıdır.
+3. **KVKK & Veri Gizliliği**: GitHub deposuna gerçek müşteri kişisel verileri (PII), API anahtarları veya oturum verileri yüklenmemektedir.
 
 ---
 
 ## 📄 Lisans
 
-License: Not specified
+MIT License © 2026 Turkcell Superonline Enterprise Team

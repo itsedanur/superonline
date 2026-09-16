@@ -123,24 +123,56 @@ class SuperonlinePrototypeScraper:
         if not date_el:
             return None, "FAILED"
 
-        raw_txt = date_el.get_text(strip=True)
+        raw_txt = date_el.get_text(strip=True).lower()
         if not raw_txt:
             return None, "FAILED"
 
         parsed_dt = None
-        for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M", "%d %B %Y", "%Y-%m-%d"]:
-            try:
-                parsed_dt = datetime.strptime(raw_txt, fmt)
-                break
-            except Exception:
-                pass
+        
+        # 1. Relative Times
+        if "saat önce" in raw_txt:
+            match = re.search(r'(\d+)\s+saat', raw_txt)
+            if match:
+                parsed_dt = now_dt - timedelta(hours=int(match.group(1)))
+        elif "gün önce" in raw_txt:
+            match = re.search(r'(\d+)\s+gün', raw_txt)
+            if match:
+                parsed_dt = now_dt - timedelta(days=int(match.group(1)))
+        elif "hafta önce" in raw_txt:
+            match = re.search(r'(\d+)\s+hafta', raw_txt)
+            if match:
+                parsed_dt = now_dt - timedelta(weeks=int(match.group(1)))
+        elif "ay önce" in raw_txt:
+            match = re.search(r'(\d+)\s+ay', raw_txt)
+            if match:
+                parsed_dt = now_dt - timedelta(days=int(match.group(1)) * 30)
+        elif "dün" in raw_txt:
+            parsed_dt = now_dt - timedelta(days=1)
+        
+        # 2. Turkish Months mapping
+        if parsed_dt is None:
+            tr_months = {
+                "ocak": "01", "şubat": "02", "mart": "03", "nisan": "04", "mayıs": "05", "haziran": "06",
+                "temmuz": "07", "ağustos": "08", "eylül": "09", "ekim": "10", "kasım": "11", "aralık": "12"
+            }
+            mapped_txt = raw_txt
+            for tr_m, num_m in tr_months.items():
+                if tr_m in mapped_txt:
+                    mapped_txt = mapped_txt.replace(tr_m, num_m)
+                    
+            for fmt in ["%d %m %Y %H:%M", "%d %m %Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d.%m.%Y %H:%M", "%d.%m.%Y", "%Y-%m-%d"]:
+                try:
+                    parsed_dt = datetime.strptime(mapped_txt, fmt)
+                    break
+                except ValueError:
+                    pass
 
         if parsed_dt is None:
             match = re.search(r'(\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2})', raw_txt)
             if match:
                 try:
                     parsed_dt = datetime.strptime(match.group(1), "%d.%m.%Y %H:%M")
-                except Exception:
+                except ValueError:
                     pass
 
         if parsed_dt is None:

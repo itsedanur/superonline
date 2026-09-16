@@ -21,6 +21,15 @@ let pdContentTypeChartInstance = null;
 let pdPlatformChartInstance = null;
 let pdTopicChartInstance = null;
 
+function formatTurkishDate(dateString) {
+    if (!dateString) return "-";
+    try {
+        const d = new Date(dateString + "Z");
+        if (isNaN(d.getTime())) return dateString;
+        return d.toLocaleString('tr-TR', {timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}).replace(',', '');
+    } catch(e) { return dateString; }
+}
+
 let currentComplaints = [];
 let currentReviewQueue = [];
 let currentActiveItem = null;
@@ -79,35 +88,116 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function handleHashRouting() {
     const rawHash = window.location.hash || "";
-    const hash = rawHash.replace("#", "").replace(/^\//, "");
+    const hashWithoutHash = rawHash.replace("#", "").replace(/^\//, "");
     
-    if (!hash) return;
+    // Parse path and query
+    const [hashPath, hashQuery] = hashWithoutHash.split("?");
+    const urlParams = new URLSearchParams(hashQuery || "");
 
-    if (hash === "executive") {
-        switchTab("executive");
-    } else if (hash === "complaints" || hash === "database") {
-        switchTab("complaints-db");
-    } else if (hash === "dashboard") {
+    if (!hashPath) return;
+
+    // Apply Product Filters from URL if they exist
+    if (hashPath.startsWith("products/")) {
+        const pDateType = urlParams.get("date_type");
+        if (pDateType) document.getElementById("pd-filter-date-type").value = pDateType;
+
+        const pDate = urlParams.get("period") || urlParams.get("date_range");
+        if (pDate) document.getElementById("pd-filter-date").value = pDate;
+        
+        const pPlat = urlParams.get("platform");
+        if (pPlat) document.getElementById("pd-filter-platform").value = pPlat;
+        
+        const pSent = urlParams.get("sentiment");
+        if (pSent) document.getElementById("pd-filter-sentiment").value = pSent;
+        
+        const pCat = urlParams.get("category");
+        if (pCat) document.getElementById("pd-filter-category").value = pCat;
+        
+        const pStat = urlParams.get("status");
+        if (pStat) document.getElementById("pd-filter-status").value = pStat;
+
+        // Custom Date Handling
+        if (pDate === "CUSTOM" || urlParams.get("date_from")) {
+            const dFrom = urlParams.get("date_from");
+            const dTo = urlParams.get("date_to");
+            if (dFrom) document.getElementById("pd-date-from").value = dFrom;
+            if (dTo) document.getElementById("pd-date-to").value = dTo;
+            document.getElementById("pd-filter-date").value = "CUSTOM";
+        }
+        
+        // Show/hide custom date picker
+        const dateFilterVal = document.getElementById("pd-filter-date")?.value;
+        const customContainer = document.getElementById("pd-custom-date-container");
+        if (customContainer) {
+            customContainer.style.display = dateFilterVal === "CUSTOM" ? "flex" : "none";
+        }
+    }
+    
+    // Apply Complaints Filters from URL if they exist
+    if (hashPath === "complaints" || hashPath === "database") {
+        const cDateType = urlParams.get("date_type");
+        if (cDateType) document.getElementById("filter-date-type").value = cDateType;
+
+        const cDate = urlParams.get("period") || urlParams.get("date_range");
+        if (cDate) document.getElementById("filter-date").value = cDate;
+        
+        if (cDate === "CUSTOM" || urlParams.get("date_from")) {
+            const dFrom = urlParams.get("date_from");
+            const dTo = urlParams.get("date_to");
+            if (dFrom) document.getElementById("custom-date-from").value = dFrom;
+            if (dTo) document.getElementById("custom-date-to").value = dTo;
+            document.getElementById("filter-date").value = "CUSTOM";
+        }
+        
+        const dateFilterVal = document.getElementById("filter-date")?.value;
+        const customContainer = document.getElementById("custom-date-container");
+        if (customContainer) {
+            customContainer.style.display = dateFilterVal === "CUSTOM" ? "inline-flex" : "none";
+        }
+    }
+
+    if (hashPath === "executive") {
+        switchTab("executive", true);
+    } else if (hashPath === "complaints" || hashPath === "database") {
+        switchTab("complaints-db", true);
+        loadComplaintsDataFromURL();
+    } else if (hashPath === "dashboard") {
         switchTab("dashboard");
-    } else if (hash.startsWith("scrape-runs/")) {
-        const runId = hash.replace("scrape-runs/", "");
+    } else if (hashPath.startsWith("scrape-runs/")) {
+        const runId = hashPath.replace("scrape-runs/", "");
         switchTab("scrape-runs");
         loadScrapeRunDetail(runId);
-    } else if (hash === "review-queue") {
+    } else if (hashPath === "review-queue") {
         switchTab("review-queue");
-    } else if (hash === "reviewed-complaints") {
+    } else if (hashPath === "reviewed-complaints") {
         switchTab("reviewed-complaints");
-    } else if (hash === "live-analyzer") {
+    } else if (hashPath === "live-analyzer") {
         switchTab("live-analyzer");
-    } else if (hash === "social-providers") {
+    } else if (hashPath === "social-providers") {
         switchTab("social-providers");
-    } else if (hash.startsWith("products/")) {
-        const prod = hash.replace("products/", "");
-        if (["fiber", "superbox", "adsl", "dsl"].includes(prod)) {
+    } else if (hashPath.startsWith("products/")) {
+        let prod = hashPath.replace("products/", "");
+        prod = prod.split("?")[0];
+        if (true) {
             const targetProd = prod === "dsl" ? "adsl" : prod;
-            switchTab(`product-${targetProd}`);
+            switchTab(`product-${targetProd}`, true);
+            
+            const pUpper = targetProd.toUpperCase();
+            const prodNameMap = {
+                "FIBER": "Fiber",
+                "SUPERBOX": "Superbox",
+                "ADSL": "ADSL",
+                "DSL": "ADSL",
+                "BIP": "BiP",
+                "TV+": "TV+",
+                "FIZY": "fizy",
+                "GAME+": "Game+",
+                "LIFEBOX": "lifebox"
+            };
+            const prodName = prodNameMap[pUpper] || targetProd;
+            loadProductDetailData(prodName);
         } else if (prod === "compare") {
-            switchTab("product-compare");
+            switchTab("product-compare", true);
         }
     }
 }
@@ -161,7 +251,7 @@ async function startPrototypeScrape(strategy = "INCREMENTAL") {
 
     } catch (error) {
         console.error("PROTOTYPE_SCRAPE_ERROR", error);
-        alert("Veri toplama işlemi hatası: " + error.message);
+        showEnterpriseModal("Hata", "Veri toplama işlemi hatası: " + error.message);
     }
 }
 
@@ -203,7 +293,7 @@ async function pollPrototypeScrape(runId) {
             const pm = data.productMetrics || {};
 
             let summaryLines = [];
-            summaryLines.push(insCount > 0 ? "✅ Canlı Veri Toplama Tamamlandı!" : (foundCount > 0 ? "ℹ️ Veriler başarıyla tarandı (DB Duplicate mevcut)." : "⚠️ Veri toplama tamamlandı / durduruldu."));
+            summaryLines.push(insCount > 0 ? "Canlı Veri Toplama Tamamlandı!" : (foundCount > 0 ? "Veriler başarıyla tarandı (DB Duplicate mevcut)." : "Veri toplama tamamlandı / durduruldu."));
             summaryLines.push(`Strateji: ${data.strategy || 'N/A'} | Durum: ${data.status} | Run ID: ${runId}\n`);
 
             if (Object.keys(pm).length > 0) {
@@ -215,7 +305,7 @@ async function pollPrototypeScrape(runId) {
 
             summaryLines.push(`\nGenel Toplam -> Bulunan (Benzersiz): ${foundCount} | Yeni Eklenen: +${insCount} | Duplicate: ${dupCount}`);
 
-            alert(summaryLines.join("\n"));
+            showEnterpriseModal("Bilgi", summaryLines.join("<br>"));
 
             // Auto refresh UI data & complaints table
             await loadDashboardData();
@@ -268,7 +358,7 @@ function initTabSwitcher() {
     });
 }
 
-function switchTab(tabId) {
+function switchTab(tabId, skipHashUpdate = false) {
     document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
     document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
 
@@ -279,7 +369,53 @@ function switchTab(tabId) {
 
     if (tabId.startsWith("product-")) {
         const subProd = tabId.replace("product-", "");
-        window.location.hash = `#/products/${subProd}`;
+        
+        if (!skipHashUpdate) {
+            // Build query string from existing DOM states
+            let dateVal = "ALL";
+            let dateTypeVal = "added";
+            let dateFrom = "";
+            let dateTo = "";
+            
+            // If we are coming from Complaints tab, use its date filter
+            if (document.body.getAttribute("data-active-tab") === "complaints-db" || !document.getElementById("pd-filter-date")?.value) {
+                dateVal = document.getElementById("filter-date")?.value || "ALL";
+                dateTypeVal = document.getElementById("filter-date-type")?.value || "added";
+                if (dateVal === "CUSTOM") {
+                    dateFrom = document.getElementById("custom-date-from")?.value || "";
+                    dateTo = document.getElementById("custom-date-to")?.value || "";
+                }
+            } else {
+                // Otherwise use current Product Analytics date filter
+                dateVal = document.getElementById("pd-filter-date")?.value || "ALL";
+                dateTypeVal = document.getElementById("pd-filter-date-type")?.value || "added";
+                if (dateVal === "CUSTOM") {
+                    dateFrom = document.getElementById("pd-date-from")?.value || "";
+                    dateTo = document.getElementById("pd-date-to")?.value || "";
+                }
+            }
+
+            const platform = document.getElementById("pd-filter-platform")?.value || "ALL";
+            const sentiment = document.getElementById("pd-filter-sentiment")?.value || "ALL";
+            const category = document.getElementById("pd-filter-category")?.value || "ALL";
+            const status = document.getElementById("pd-filter-status")?.value || "ALL";
+
+            let q = [];
+            if (platform !== "ALL") q.push(`platform=${platform}`);
+            if (dateVal !== "ALL") q.push(`date_range=${dateVal}`);
+            q.push(`date_type=${dateTypeVal}`);
+            if (sentiment !== "ALL") q.push(`sentiment=${sentiment}`);
+            if (category !== "ALL") q.push(`category=${category}`);
+            if (status !== "ALL") q.push(`status=${status}`);
+            
+            if (dateVal === "CUSTOM") {
+                if (dateFrom) q.push(`date_from=${dateFrom}`);
+                if (dateTo) q.push(`date_to=${dateTo}`);
+            }
+
+            const qs = q.length > 0 ? `?${q.join("&")}` : "";
+            window.location.hash = `#/products/${subProd}${qs}`;
+        }
         
         if (tabId === "product-compare") {
             const tabEl = document.getElementById("tab-product-compare");
@@ -303,24 +439,25 @@ function switchTab(tabId) {
             const prodName = prodNameMap[prod] || subProd;
             loadProductDetailData(prodName);
         }
+        document.getElementById("page-title").innerText = "Ürün Analitiği";
         return;
     }
 
     if (tabId === "executive") {
-        window.location.hash = "#/executive";
+        if (!skipHashUpdate) window.location.hash = "#/executive";
         loadExecutiveDashboardData();
     } else if (tabId === "complaints-db") {
-        window.location.hash = "#/complaints";
+        if (!skipHashUpdate) window.location.hash = "#/complaints";
     } else if (tabId === "dashboard") {
-        window.location.hash = "#/dashboard";
+        if (!skipHashUpdate) window.location.hash = "#/dashboard";
     } else if (tabId === "review-queue") {
-        window.location.hash = "#/review-queue";
+        if (!skipHashUpdate) window.location.hash = "#/review-queue";
     } else if (tabId === "reviewed-complaints") {
-        window.location.hash = "#/reviewed-complaints";
+        if (!skipHashUpdate) window.location.hash = "#/reviewed-complaints";
     } else if (tabId === "live-analyzer") {
-        window.location.hash = "#/live-analyzer";
+        if (!skipHashUpdate) window.location.hash = "#/live-analyzer";
     } else if (tabId === "social-providers") {
-        window.location.hash = "#/social-providers";
+        if (!skipHashUpdate) window.location.hash = "#/social-providers";
         loadSocialProvidersStatus();
     }
 
@@ -332,11 +469,15 @@ function switchTab(tabId) {
         "dashboard": "Turkcell Superonline Genel Bakış (KPI)",
         "live-analyzer": "Canlı AI / LLM Bağlam & Çoklu Ürün Analiz Testi",
         "review-queue": "Manuel İnceleme Kuyruğu",
-        "reviewed-complaints": "İncelenen Şikâyetler",
+        "reviewed-complaints": "İncelenen Kayıtlar",
         "complaints-db": "Veritabanı & Şikayet Kayıtları",
         "social-providers": "Sosyal Medya Kaynakları"
     };
-    document.getElementById("page-title").innerText = titleMap[tabId] || "Superonline AI Platform";
+    if (tabId.startsWith('product-')) {
+        document.getElementById("page-title").innerText = "Ürün Analitiği";
+    } else {
+        document.getElementById("page-title").innerText = titleMap[tabId] || "Superonline AI Platform";
+    }
 
     if (tabId === "review-queue") {
         loadReviewQueueData();
@@ -347,107 +488,305 @@ function switchTab(tabId) {
     }
 }
 
+
+
+let pdContentTypeChart = null;
+let pdPlatformChart = null;
+let pdTopicChart = null;
+
+const LABEL_MAP_CONTENT_TYPE = {
+    "COMPLAINT": "Şikâyet",
+    "QUESTION": "Soru",
+    "REQUEST": "Talep",
+    "PRAISE": "Övgü",
+    "COMMENT": "Genel Yorum",
+    "TECHNICAL_SUPPORT": "Teknik Destek",
+    "SUGGESTION": "Öneri",
+    "CAMPAIGN_INTERACTION": "Kampanya Etkileşimi"
+};
+
+const LABEL_MAP_PLATFORM = {
+    "SIKAYETVAR": "Şikayetvar",
+    "X": "X",
+    "INSTAGRAM": "Instagram",
+    "FACEBOOK": "Facebook",
+    "TIKTOK": "TikTok",
+    "BIP": "BiP",
+    "PLAY_STORE": "Play Store",
+    "APP_STORE": "App Store"
+};
+
+const LABEL_MAP_SENTIMENT = {
+    "Negative": "Olumsuz",
+    "Neutral": "Nötr",
+    "Positive": "Olumlu"
+};
+
+const LABEL_MAP_STATUS = {
+    "NEW": "Yeni",
+    "REVIEW_PENDING": "İnceleme Bekliyor",
+    "APPROVED": "Onaylandı",
+    "CORRECTED": "Düzeltilerek Onaylandı",
+    "REJECTED": "Reddedildi",
+    "DEFERRED": "Ertelendi",
+    "CLOSED": "Kapatıldı",
+    "OPEN": "Açık"
+};
+
+const SENTIMENT_COLORS = {
+    "Negative": "var(--turkcell-red)",
+    "Neutral": "var(--turkcell-yellow)",
+    "Positive": "var(--turkcell-green)"
+};
+
+async function applyProductFilters() {
+    if (!currentSelectedProduct) return;
+    
+    const platform = document.getElementById("pd-filter-platform")?.value || "ALL";
+    const dateRange = document.getElementById("pd-filter-date")?.value || "ALL";
+    const dateType = document.getElementById("pd-filter-date-type")?.value || "added";
+    const sentiment = document.getElementById("pd-filter-sentiment")?.value || "ALL";
+    const category = document.getElementById("pd-filter-category")?.value || "ALL";
+    const status = document.getElementById("pd-filter-status")?.value || "ALL";
+    
+    let query = [];
+    if (platform !== "ALL") query.push(`platform=${platform}`);
+    if (dateRange !== "ALL") query.push(`date_range=${dateRange}`);
+    query.push(`date_type=${dateType}`);
+    if (sentiment !== "ALL") query.push(`sentiment=${sentiment}`);
+    if (category !== "ALL") query.push(`category=${category}`);
+    if (status !== "ALL") query.push(`status=${status}`);
+    
+    if (dateRange === 'CUSTOM') {
+        const start = document.getElementById('pd-date-from').value;
+        const end = document.getElementById('pd-date-to').value;
+        if (start) query.push(`date_from=${start}`);
+        if (end) query.push(`date_to=${end}`);
+    }
+    
+    const targetProd = currentSelectedProduct === "ADSL" ? "dsl" : currentSelectedProduct.toLowerCase();
+    const queryString = query.length > 0 ? `?${query.join("&")}` : "";
+    window.location.hash = `#/products/${targetProd}${queryString}`;
+}
+
+function resetProductFilters() {
+    if (!currentSelectedProduct) return;
+    const targetProd = currentSelectedProduct === "ADSL" ? "dsl" : currentSelectedProduct.toLowerCase();
+    window.location.hash = `#/products/${targetProd}`;
+}
+
 async function loadProductDetailData(productName) {
     currentSelectedProduct = productName;
 
     const titleEl = document.getElementById("pd-title");
     if (titleEl) {
-        const icon = ["Fiber", "Superbox", "ADSL", "DSL"].includes(productName) ? "🔌" : "📱";
-        titleEl.innerHTML = `${icon} ${productName} Analiz Detayı`;
+        titleEl.innerText = `${productName} Analiz Detayı`;
+    }
+
+    // Update segmented control active state
+    document.querySelectorAll(".product-tab-btn").forEach(btn => btn.classList.remove("active"));
+    const activeBtn = document.getElementById(`btn-prod-${productName}`);
+    if (activeBtn) activeBtn.classList.add("active");
+
+    const platform = document.getElementById("pd-filter-platform")?.value || "ALL";
+    const dateSel = document.getElementById("pd-filter-date")?.value || "ALL";
+    const dateTypeSel = document.getElementById("pd-filter-date-type")?.value || "added";
+    const sentiment = document.getElementById("pd-filter-sentiment")?.value || "ALL";
+    const category = document.getElementById("pd-filter-category")?.value || "ALL";
+    const status = document.getElementById("pd-filter-status")?.value || "ALL";
+
+    const customContainer = document.getElementById("pd-custom-date-container");
+    if (customContainer) {
+        customContainer.style.display = dateSel === "CUSTOM" ? "flex" : "none";
+    }
+
+    let dateRange = dateSel;
+    if (dateSel === "CUSTOM") {
+        const start = document.getElementById("pd-date-from")?.value;
+        const end = document.getElementById("pd-date-to")?.value;
+        if (start && end) {
+            dateRange = `${start},${end}`;
+        }
     }
 
     try {
-        const res = await fetch(`${API_BASE}/api/v1/products/${productName}/analytics`);
+        const url = `${API_BASE}/api/v1/product-analytics?product=${encodeURIComponent(productName)}&platform=${platform}&date_range=${dateRange}&date_type=${dateTypeSel}&sentiment=${sentiment}&category=${category}&status=${status}`;
+        
+        // Show loading state
+        const contentArea = document.getElementById("pd-content-area");
+        const emptyState = document.getElementById("pd-empty-state");
+        const loadingState = document.getElementById("pd-loading-state");
+        
+        if (contentArea) contentArea.style.display = "none";
+        if (emptyState) emptyState.classList.add("hidden");
+        if (loadingState) loadingState.classList.remove("hidden");
+
+        const res = await fetch(url);
         if (!res.ok) throw new Error("API hatası: " + res.status);
         
-        const summary = await res.json();
+        const data = await res.json();
         
-        document.getElementById("pd-kpi-total").innerText = summary.total_content.toLocaleString('tr-TR');
-        
-        const weeklyTag = document.getElementById("pd-kpi-weekly-change");
-        if (summary.weekly_change_percentage !== null && summary.weekly_change_percentage !== undefined) {
-            if (summary.weekly_change_percentage >= 0) {
-                weeklyTag.style.background = "rgba(34, 197, 94, 0.2)";
-                weeklyTag.style.color = "#4ADE80";
-                weeklyTag.innerText = `+${summary.weekly_change_percentage}% Haftalık`;
-            } else {
-                weeklyTag.style.background = "rgba(239, 68, 68, 0.2)";
-                weeklyTag.style.color = "#EF4444";
-                weeklyTag.innerText = `${summary.weekly_change_percentage}% Haftalık`;
+        if (loadingState) loadingState.classList.add("hidden");
+
+        if (data.kpis.total === 0) {
+            if (contentArea) contentArea.style.display = "none";
+            if (emptyState) {
+                emptyState.classList.remove("hidden");
+                const esTitle = emptyState.querySelector("h3");
+                const esDesc = emptyState.querySelector("p");
+                
+                if (dateTypeSel === "published") {
+                    if (data.kpis.missing_publish_date_count > 0) {
+                        esTitle.innerText = "Yayın Tarihi Bulunmayan Kayıtlar";
+                        esDesc.innerText = `${data.kpis.missing_publish_date_count} kaydın yayın tarihi bulunmadığı için bu analize dahil edilmedi.`;
+                    } else {
+                        esTitle.innerText = "İçerik bulunmuyor";
+                        esDesc.innerText = "Seçilen dönemde yayın tarihi doğrulanabilen içerik bulunmuyor.";
+                    }
+                } else {
+                    esTitle.innerText = "Henüz veri bulunmuyor";
+                    esDesc.innerText = "Bu filtreler için sisteme aktarılmış şikâyet içeriği bulunmamaktadır.";
+                }
             }
+            return;
         } else {
-            weeklyTag.style.background = "rgba(148, 163, 184, 0.2)";
-            weeklyTag.style.color = "#94A3B8";
-            weeklyTag.innerText = "Karşılaştırma verisi yok";
+            if (contentArea) contentArea.style.display = "block";
+            if (emptyState) emptyState.classList.add("hidden");
+        }
+
+        // Handle Missing Date Banner
+        const missingBanner = document.getElementById("pd-missing-date-banner");
+        const missingCount = document.getElementById("pd-missing-date-count");
+        if (missingBanner && missingCount) {
+            if (dateTypeSel === "published" && data.kpis.missing_publish_date_count > 0) {
+                missingCount.innerText = data.kpis.missing_publish_date_count.toLocaleString('tr-TR');
+                missingBanner.style.display = "flex";
+                missingBanner.classList.remove("hidden");
+            } else {
+                missingBanner.style.display = "none";
+                missingBanner.classList.add("hidden");
+            }
+        }
+
+        // KPIs
+        document.getElementById("pd-kpi-total").innerText = data.kpis.total > 0 ? data.kpis.total.toLocaleString('tr-TR') : "0";
+        document.getElementById("pd-kpi-open").innerText = data.kpis.open > 0 ? data.kpis.open.toLocaleString('tr-TR') : "0";
+        document.getElementById("pd-kpi-closed").innerText = data.kpis.closed > 0 ? data.kpis.closed.toLocaleString('tr-TR') : "0";
+        document.getElementById("pd-kpi-ai-approved").innerText = data.kpis.ai_approved > 0 ? data.kpis.ai_approved.toLocaleString('tr-TR') : "0";
+        document.getElementById("pd-kpi-expert-corrected").innerText = data.kpis.expert_corrected > 0 ? data.kpis.expert_corrected.toLocaleString('tr-TR') : "0";
+        
+        document.getElementById("pd-kpi-frt").innerText = data.kpis.avg_first_response_hours ? `${data.kpis.avg_first_response_hours}s` : "Veri Yok";
+        document.getElementById("pd-kpi-rt").innerText = data.kpis.avg_resolution_hours ? `${data.kpis.avg_resolution_hours}s` : "Veri Yok";
+        
+        document.getElementById("pd-kpi-csat").innerText = "Veri Yok";
+        document.getElementById("pd-kpi-csat-rate").innerText = "Veri Yok";
+
+        // Render Charts
+        renderPdCharts(data.charts);
+
+        // Render Table
+        const tbody = document.getElementById("pd-recent-tbody");
+        if (tbody) {
+            tbody.innerHTML = "";
+            if (data.recent_records.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 24px; color: var(--text-muted);">Seçili filtrelere uygun kayıt bulunamadı.</td></tr>`;
+            } else {
+                data.recent_records.forEach(item => {
+                    const tr = document.createElement("tr");
+                    const statusTR = LABEL_MAP_STATUS[item.case_status] || item.case_status;
+                    const sentTR = LABEL_MAP_SENTIMENT[item.sentiment] || item.sentiment;
+                    const sentColor = SENTIMENT_COLORS[item.sentiment] || "var(--text-muted)";
+                    const platTR = LABEL_MAP_PLATFORM[item.platform] || item.platform;
+                    
+                    tr.innerHTML = `
+                        <td style="white-space: nowrap; font-size: 0.85rem;">${formatTurkishDate(item.date)}</td>
+                        <td><span class="info-badge" style="background: var(--bg-hover);">${platTR}</span></td>
+                        <td><strong>${item.final_product || item.primary_product}</strong></td>
+                        <td>
+                            <div style="font-weight:600;font-size:0.85rem; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.main_category}">${item.main_category}</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.sub_category}">${item.sub_category}</div>
+                        </td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <span style="width:8px; height:8px; border-radius:50%; background:${sentColor}; display:inline-block;"></span>
+                                <span style="font-size:0.85rem;">${sentTR}</span>
+                            </div>
+                        </td>
+                        <td style="max-width: 200px;">
+                            <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; line-height: 1.4;">
+                                <strong style="color: var(--text-color); cursor: pointer;" onclick="openReviewedDetailModal('${item.id}')" title="${item.title || item.id}">${item.title || item.id}</strong>
+                            </div>
+                        </td>
+                        <td><span class="status-badge" style="font-size: 0.75rem;">${statusTR}</span></td>
+                        <td>
+                            <button class="btn btn-icon btn-sm" onclick="openReviewedDetailModal('${item.id}')" aria-label="Detay Görüntüle" title="Detay Görüntüle" style="background: transparent; border: none; padding: 4px;">
+                                <i data-lucide="eye" style="width: 18px; height: 18px; color: var(--turkcell-blue);"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
         }
         
-        document.getElementById("pd-kpi-replied").innerText = summary.answered_count.toLocaleString('tr-TR');
-        const replyRate = (summary.answered_count / summary.total_content * 100) || 0;
-        document.getElementById("pd-kpi-reply-rate").innerText = `%${replyRate.toFixed(1)} Oran`;
-        
-        document.getElementById("pd-kpi-open-closed").innerText = `${summary.open_count.toLocaleString('tr-TR')} / ${summary.closed_count.toLocaleString('tr-TR')}`;
-        
-        const avgFirst = summary.average_first_response_hours;
-        const avgClose = summary.average_closure_hours;
-        if (avgFirst === null && avgClose === null) {
-            document.getElementById("pd-kpi-times").innerText = "Veri yok";
-        } else {
-            const firstStr = avgFirst !== null ? `${avgFirst}s` : "Veri yok";
-            const closeStr = avgClose !== null ? `${avgClose}s` : "Veri yok";
-            document.getElementById("pd-kpi-times").innerText = `${firstStr} / ${closeStr}`;
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
         }
-        
-        renderProductAnalyticsCharts(summary);
 
     } catch (e) {
-        console.log("Product detail fetch error:", e);
+        console.error("Product detail load error", e);
     }
 }
 
-function renderProductAnalyticsCharts(data) {
-    if (pdContentTypeChartInstance) pdContentTypeChartInstance.destroy();
-    if (pdPlatformChartInstance) pdPlatformChartInstance.destroy();
-    if (pdTopicChartInstance) pdTopicChartInstance.destroy();
+function renderPdCharts(chartsData) {
+    if (pdContentTypeChart) pdContentTypeChart.destroy();
+    if (pdPlatformChart) pdPlatformChart.destroy();
+    if (pdTopicChart) pdTopicChart.destroy();
 
-    const chartContainer1 = document.getElementById("productContentTypeChart")?.parentElement;
-    const chartContainer2 = document.getElementById("productPlatformChart")?.parentElement;
-    const chartContainer3 = document.getElementById("productTopicChart")?.parentElement;
-
-    if (!data.has_data) {
-        const emptyStateHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 220px; text-align: center; color: var(--text-muted);">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px; opacity: 0.5;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                <h4 style="margin: 0 0 8px 0; color: #FFF; font-size: 1.1rem;">Henüz veri bulunmuyor</h4>
-                <p style="margin: 0 0 16px 0; max-width: 300px; font-size: 0.9rem;">Bu ürün için sisteme aktarılmış gerçek sosyal medya veya Şikayetvar içeriği bulunmamaktadır.</p>
-                <button class="btn btn-primary" onclick="switchTab('social-providers')">Veri Kaynaklarına Git</button>
-            </div>
-        `;
-        if (chartContainer1) chartContainer1.innerHTML = emptyStateHTML;
-        if (chartContainer2) chartContainer2.parentElement.style.display = "none";
-        return;
-    } else {
-        if (chartContainer1) chartContainer1.innerHTML = '<canvas id="productContentTypeChart"></canvas>';
-        if (chartContainer2) {
-            chartContainer2.parentElement.style.display = "grid";
-            chartContainer2.innerHTML = '<canvas id="productPlatformChart"></canvas>';
-            chartContainer3.innerHTML = '<canvas id="productTopicChart"></canvas>';
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'right', labels: { color: 'var(--text-muted)', font: { family: 'Inter' } } },
+            tooltip: {
+                backgroundColor: 'var(--card-bg)',
+                titleColor: 'var(--text-color)',
+                bodyColor: 'var(--text-muted)',
+                borderColor: 'var(--border-color)',
+                borderWidth: 1,
+                callbacks: {
+                    label: function(context) {
+                        const label = context.label || '';
+                        const value = context.parsed || context.raw;
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                        return `${label}: ${value} Adet (%${percentage})`;
+                    }
+                }
+            }
         }
-    }
+    };
 
-    // Content Type Chart
-    const ctxCT = document.getElementById("productContentTypeChart");
-    if (ctxCT && data.content_type_distribution) {
-        chartContainer1.style.height = "280px";
-        const labels = data.content_type_distribution.map(d => d.label);
-        const counts = data.content_type_distribution.map(d => d.count);
-        pdContentTypeChartInstance = new Chart(ctxCT.getContext("2d"), {
-            type: "bar",
+    // Content Type (Horizontal Bar)
+    const ctxContent = document.getElementById("pd-chart-content-type");
+    if (ctxContent) {
+        const labels = chartsData.content_type.map(d => LABEL_MAP_CONTENT_TYPE[d.content_type] || d.content_type);
+        const data = chartsData.content_type.map(d => d.c);
+        
+        // Single category styling adjustment
+        const barThickness = labels.length === 1 ? 40 : undefined;
+        
+        pdContentTypeChart = new Chart(ctxContent.getContext('2d'), {
+            type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: "İçerik Sayısı",
-                    data: counts,
-                    backgroundColor: ["#EF4444", "#3B82F6", "#F59E0B", "#10B981", "#22C55E", "#8B5CF6", "#EC4899", "#6B7280"]
+                    label: 'İçerik Adedi',
+                    data: data,
+                    backgroundColor: ['#005BAC', '#FFC72C', '#22C55E', '#EF4444', '#8B5CF6', '#F97316', '#06B6D4', '#EC4899'],
+                    borderWidth: 0,
+                    borderRadius: 4,
+                    barThickness: barThickness
                 }]
             },
             options: {
@@ -456,80 +795,48 @@ function renderProductAnalyticsCharts(data) {
                 maintainAspectRatio: false,
                 plugins: { 
                     legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const val = context.raw;
-                                const pct = data.content_type_distribution[context.dataIndex].percentage;
-                                return ` ${val} (${pct}%)`;
-                            }
-                        }
-                    }
+                    tooltip: commonOptions.plugins.tooltip
                 },
                 scales: {
-                    x: { ticks: { color: "#94A3B8" }, grid: { color: "rgba(255, 255, 255, 0.05)" } },
-                    y: { ticks: { color: "#94A3B8" }, grid: { display: false } }
+                    x: { ticks: { color: 'var(--text-muted)', font: { family: 'Inter' } }, grid: { color: 'var(--border-color)', drawBorder: false } },
+                    y: { ticks: { color: 'var(--text-muted)', font: { family: 'Inter' } }, grid: { display: false } }
                 }
             }
         });
     }
 
-    // Platform Chart
-    const ctxPlat = document.getElementById("productPlatformChart");
-    if (ctxPlat && data.platform_distribution) {
-        chartContainer2.style.height = "280px";
-        const labels = data.platform_distribution.map(d => d.label);
-        const counts = data.platform_distribution.map(d => d.count);
-        pdPlatformChartInstance = new Chart(ctxPlat.getContext("2d"), {
-            type: "doughnut",
+    // Platform (Donut)
+    const ctxPlatform = document.getElementById("pd-chart-platform");
+    if (ctxPlatform) {
+        pdPlatformChart = new Chart(ctxPlatform.getContext('2d'), {
+            type: 'doughnut',
             data: {
-                labels: labels,
+                labels: chartsData.platform.map(d => LABEL_MAP_PLATFORM[d.platform] || d.platform),
                 datasets: [{
-                    data: counts,
-                    backgroundColor: ["#14B8A6", "#3B82F6", "#8B5CF6", "#F43F5E"],
+                    data: chartsData.platform.map(d => d.c),
+                    backgroundColor: ['#005BAC', '#FFC72C', '#22C55E', '#EF4444', '#8B5CF6', '#F97316', '#06B6D4', '#EC4899'],
                     borderWidth: 0
                 }]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { position: "right", labels: { color: "#94A3B8" } } },
-                cutout: "70%"
-            }
+            options: { ...commonOptions, cutout: '70%' }
         });
     }
 
-    // Topic Chart
-    const ctxTopic = document.getElementById("productTopicChart");
+    // Topic (Donut)
+    const ctxTopic = document.getElementById("pd-chart-topic");
     if (ctxTopic) {
-        chartContainer3.style.height = "280px";
-        if (data.has_topic_data && data.topic_distribution.length > 0) {
-            const labels = data.topic_distribution.map(d => d.label);
-            const counts = data.topic_distribution.map(d => d.count);
-            pdTopicChartInstance = new Chart(ctxTopic.getContext("2d"), {
-                type: "doughnut",
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: counts,
-                        backgroundColor: ["#F59E0B", "#10B981", "#3B82F6", "#EF4444", "#8B5CF6", "#EC4899"],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: "right", labels: { color: "#94A3B8" } } },
-                    cutout: "70%"
-                }
-            });
-        } else {
-            chartContainer3.innerHTML = `
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: var(--text-muted);">
-                    <p style="margin: 0; font-size: 0.9rem;">Bu kayıtlar için konu analizi henüz tamamlanmamış.</p>
-                </div>
-            `;
-        }
+        pdTopicChart = new Chart(ctxTopic.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: chartsData.topic.map(d => d.main_category),
+                datasets: [{
+                    data: chartsData.topic.map(d => d.c),
+                    backgroundColor: ['#005BAC', '#FFC72C', '#22C55E', '#EF4444', '#8B5CF6', '#F97316', '#06B6D4', '#EC4899'],
+                    borderWidth: 0
+                }]
+            },
+            options: { ...commonOptions, cutout: '70%' }
+        });
     }
 }
 
@@ -586,6 +893,7 @@ async function loadDashboardData() {
         }
         await filterComplaintsTable();
     } catch (err) {
+        if (err.name === 'AbortError') return;
         console.error("Backend API loadDashboardData error:", err);
     }
 }
@@ -634,7 +942,7 @@ function populateComplaintsTable(data) {
         let finalHtml = item.finalProduct ? `<span class="badge-prod" style="background:#0F172A; border: 1px solid #38BDF8;">F: ${item.finalProduct}</span>` : "";
 
         if (item.productConflict) {
-            finalHtml += `<br><span class="badge-prod other" style="background: rgba(239, 68, 68, 0.2); color: #F87171; margin-top:4px;" title="Sayfa ürünü ile AI tespiti çelişiyor">⚠️ Çelişki</span>`;
+            finalHtml += `<br><span class="badge-prod other" style="background: rgba(239, 68, 68, 0.2); color: #F87171; margin-top:4px;" title="Sayfa ürünü ile AI tespiti çelişiyor">Çelişki</span>`;
         }
 
         const decisionSrc = item.productDecisionSource || "LOCAL_RULES";
@@ -663,13 +971,17 @@ function populateComplaintsTable(data) {
             <td><span class="badge-prod" style="background: #334155; font-size: 0.7rem;">${platformLabel}</span></td>
             <td><span class="badge-prod" style="background: #475569; font-size: 0.7rem;">${contentTypeLabel}</span></td>
             <td>${sourceHtml}<br>${finalHtml}</td>
-            <td style="max-width: 320px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;" title="${textContent.replace(/"/g, '&quot;')}" data-action="view-complaint" data-complaint-id="${item.id}">${textContent}</td>
+            <td style="max-width: 320px; cursor: pointer;" title="${textContent.replace(/"/g, '&quot;')}" data-action="view-complaint" data-complaint-id="${item.id}">
+                <div style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; white-space: normal; line-height: 1.4;">${textContent}</div>
+            </td>
             <td><div style="font-weight: 600; font-size: 0.85rem;">${item.mainCategory || item.topic || "Diğer"}</div><div style="font-size: 0.75rem; color: var(--text-muted);">${item.subCategory || ""}</div></td>
             <td><span class="badge-sent ${urgency === 'High' || urgency === 'Critical' ? 'negative' : 'positive'}">${urgency}</span></td>
             <td><span style="font-family: var(--font-mono); font-weight: 700; color: var(--turkcell-yellow);">${conf}</span></td>
-            <td><span style="font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono);">${pubDate}</span></td>
+            <td style="white-space: nowrap;"><span style="font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono);">${formatTurkishDate(pubDate)}</span></td>
             <td style="display: flex; gap: 4px;">
-                <button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.75rem;" data-action="view-complaint" data-complaint-id="${item.id}">🔍 İncele</button>
+                <button type="button" class="btn btn-icon btn-sm" style="background: transparent; border: none; padding: 4px;" data-action="view-complaint" data-complaint-id="${item.id}" title="Detay Görüntüle">
+                    <i data-lucide="eye" style="width: 18px; height: 18px; color: var(--turkcell-blue);"></i>
+                </button>
                 ${sourceUrlBtn}
             </td>
         `;
@@ -682,22 +994,70 @@ async function filterComplaintsTable() {
     const contentSelect = document.getElementById("filter-content-type");
     const prodSelect = document.getElementById("filter-product");
     const dateSelect = document.getElementById("filter-date");
+    const dateTypeSelect = document.getElementById("filter-date-type");
     const sortSelect = document.getElementById("sort-date");
 
     const platformFilter = platformSelect ? platformSelect.value : "ALL";
     const contentFilter = contentSelect ? contentSelect.value : "ALL";
     const prodFilter = prodSelect ? prodSelect.value : "ALL";
-    const dateRange = dateSelect ? dateSelect.value : "ALL";
+    let dateRange = dateSelect ? dateSelect.value : "ALL";
+    const dateType = dateTypeSelect ? dateTypeSelect.value : "added";
     const sortOrder = sortSelect ? sortSelect.value : "DESC";
 
+    let query = [];
+    if (platformFilter !== "ALL") query.push(`platform=${platformFilter}`);
+    if (contentFilter !== "ALL") query.push(`content_type=${contentFilter}`);
+    if (prodFilter !== "ALL") query.push(`product=${prodFilter}`);
+    if (dateRange !== "ALL") query.push(`date_range=${dateRange}`);
+    query.push(`date_type=${dateType}`);
+    if (sortOrder !== "DESC") query.push(`sort=${sortOrder}`);
+    
+    if (dateRange === 'CUSTOM') {
+        const start = document.getElementById('custom-date-from').value;
+        const end = document.getElementById('custom-date-to').value;
+        if (start) query.push(`date_from=${start}`);
+        if (end) query.push(`date_to=${end}`);
+    }
+
+    const queryString = query.length > 0 ? `?${query.join("&")}` : "";
+    window.location.hash = `#/complaints${queryString}`;
+}
+
+async function loadComplaintsDataFromURL() {
+    const platformSelect = document.getElementById("filter-platform");
+    const contentSelect = document.getElementById("filter-content-type");
+    const prodSelect = document.getElementById("filter-product");
+    const dateSelect = document.getElementById("filter-date");
+    const dateTypeSelect = document.getElementById("filter-date-type");
+    const sortSelect = document.getElementById("sort-date");
+
+    const platformFilter = platformSelect ? platformSelect.value : "ALL";
+    const contentFilter = contentSelect ? contentSelect.value : "ALL";
+    const prodFilter = prodSelect ? prodSelect.value : "ALL";
+    let dateRange = dateSelect ? dateSelect.value : "ALL";
+    const dateType = dateTypeSelect ? dateTypeSelect.value : "added";
+    const sortOrder = sortSelect ? sortSelect.value : "DESC";
+
+    if (dateRange === 'CUSTOM') {
+        const start = document.getElementById('custom-date-from').value;
+        const end = document.getElementById('custom-date-to').value;
+        if (start && end) {
+            dateRange = `${start},${end}`;
+        }
+    }
+    const customContainer = document.getElementById("custom-date-container");
+    if (customContainer) {
+        customContainer.style.display = dateSelect && dateSelect.value === "CUSTOM" ? "inline-flex" : "none";
+    }
+
     try {
-        const url = `${API_BASE}/api/v1/complaints?product=${encodeURIComponent(prodFilter)}&date_range=${encodeURIComponent(dateRange)}&sort=${encodeURIComponent(sortOrder)}&platform=${encodeURIComponent(platformFilter)}&content_type=${encodeURIComponent(contentFilter)}`;
+        const url = `${API_BASE}/api/v1/complaints?product=${encodeURIComponent(prodFilter)}&date_range=${encodeURIComponent(dateRange)}&date_type=${encodeURIComponent(dateType)}&sort=${encodeURIComponent(sortOrder)}&platform=${encodeURIComponent(platformFilter)}&content_type=${encodeURIComponent(contentFilter)}`;
         const res = await fetch(url);
         
         if (!res.ok) {
             const errTxt = await res.text();
             console.error("COMPLAINTS_API_ERROR", res.status, errTxt);
-            alert(`Şikâyet kayıtları yüklenemedi (HTTP ${res.status}): ${errTxt}`);
+            showEnterpriseModal("Hata", `Şikâyet kayıtları yüklenemedi (HTTP ${res.status}): ${errTxt}`);
             return;
         }
 
@@ -706,7 +1066,7 @@ async function filterComplaintsTable() {
 
     } catch (e) {
         console.error("Filtreleme API hatası:", e);
-        alert("Şikâyet kayıtları yüklenemedi: " + e.message);
+        showEnterpriseModal("Hata", "Şikâyet kayıtları yüklenemedi: " + e.message);
     }
 }
 
@@ -794,9 +1154,16 @@ function populateReviewQueueTable(data) {
     tbody.innerHTML = "";
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding: 24px; color: var(--text-muted);">Manuel inceleme bekleyen kayıt bulunmamaktadır. Tüm şikayetler yüksek güvenle onaylanmıştır.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding: 24px; color: var(--text-muted);">Manuel inceleme bekleyen kayıt bulunmamaktadır.</td></tr>`;
         return;
     }
+
+    const URGENCY_MAP = {
+        "Low": { text: "Düşük", color: "var(--turkcell-green)", bg: "rgba(16, 185, 129, 0.1)" },
+        "Medium": { text: "Orta", color: "var(--turkcell-yellow)", bg: "rgba(245, 158, 11, 0.1)" },
+        "High": { text: "Yüksek", color: "var(--turkcell-orange)", bg: "rgba(249, 115, 22, 0.1)" },
+        "Critical": { text: "Kritik", color: "var(--turkcell-red)", bg: "rgba(239, 68, 68, 0.1)" }
+    };
 
     data.forEach(item => {
         const tr = document.createElement("tr");
@@ -804,29 +1171,53 @@ function populateReviewQueueTable(data) {
         const sourceProd = item.sourceProduct || primary;
 
         const conflictBadge = item.productConflict ? 
-            `<span class="badge-sent negative" style="background: rgba(239, 68, 68, 0.2); color: #F87171;">⚠️ Evet</span>` : 
-            `<span style="color: var(--text-muted); font-size: 0.8rem;">Hayır</span>`;
+            `<span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: var(--turkcell-red);">Çelişki</span>` : 
+            `<span style="color: var(--text-muted); font-size: 0.8rem;">Yok</span>`;
 
         const conf = item.confidence || 0.95;
         const urgency = item.urgency || "Medium";
+        const urgObj = URGENCY_MAP[urgency] || URGENCY_MAP["Medium"];
+        
+        const platTR = LABEL_MAP_PLATFORM[item.source] || item.source || "Şikayetvar";
+        const sentTR = LABEL_MAP_SENTIMENT[item.sentiment] || item.sentiment;
+        const sentColor = SENTIMENT_COLORS[item.sentiment] || "var(--text-muted)";
+        const statusTR = LABEL_MAP_STATUS[item.reviewStatus] || item.reviewStatus || "İnceleme Bekliyor";
+
+        const textPreview = item.maskedText || item.masked_content || "";
 
         tr.innerHTML = `
-            <td><strong>${item.id}</strong></td>
-            <td><span class="info-badge">${item.source || "Şikayetvar"}</span></td>
-            <td><span class="badge-prod other">${sourceProd}</span></td>
-            <td><span class="badge-prod fiber">${primary}</span></td>
-            <td style="max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.maskedText || item.masked_content}</td>
+            <td>
+                <a href="#" class="corporate-link" onclick="openReviewDetailModal('${item.id}'); return false;"><strong>${item.id}</strong></a>
+            </td>
+            <td><span class="info-badge" style="background: var(--bg-hover);">${platTR}</span></td>
+            <td><span class="info-badge">${sourceProd}</span></td>
+            <td><span class="info-badge" style="border: 1px solid var(--turkcell-blue); color: var(--turkcell-blue);">${primary}</span></td>
+            <td style="max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${textPreview.replace(/"/g, '&quot;')}">
+                <a href="#" class="corporate-link" onclick="openReviewDetailModal('${item.id}'); return false;" style="color: var(--text-color);">${textPreview}</a>
+            </td>
             <td><div style="font-weight: 600; font-size: 0.8rem;">${item.mainCategory || "Diğer"}</div><div style="font-size: 0.72rem; color: var(--text-muted);">${item.subCategory || ""}</div></td>
-            <td><span style="font-size: 0.8rem;">${item.sentiment}</span></td>
-            <td><span class="badge-sent ${urgency === 'High' || urgency === 'Critical' ? 'negative' : 'positive'}">${urgency}</span></td>
-            <td><span style="font-family: var(--font-mono); font-weight: 700; color: ${conf < 0.85 ? '#F87171' : 'var(--turkcell-yellow)'};">${conf}</span></td>
-            <td>${conflictBadge}</td>
-            <td><span class="info-badge" style="font-size: 0.72rem;">${item.reviewStatus || 'PENDING'}</span></td>
+            <td>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="width:8px; height:8px; border-radius:50%; background:${sentColor}; display:inline-block;"></span>
+                    <span style="font-size:0.8rem;">${sentTR}</span>
+                </div>
+            </td>
+            <td><span class="status-badge" style="background: ${urgObj.bg}; color: ${urgObj.color};">${urgObj.text}</span></td>
+            <td><span style="font-family: var(--font-mono); font-weight: 700; color: ${conf < 0.85 ? 'var(--turkcell-red)' : 'var(--turkcell-yellow)'};">${conf}</span></td>
+            <td>${statusTR === 'İnceleme Bekliyor' ? '<span class="status-badge" style="background: rgba(148, 163, 184, 0.15); color: #94A3B8;">Bekliyor</span>' : `<span class="status-badge">${statusTR}</span>`}</td>
             <td><span style="font-size: 0.75rem; color: var(--text-muted);">${item.date || ""}</span></td>
-            <td><button type="button" class="btn btn-outline" style="padding: 4px 8px; font-size: 0.75rem;" data-action="review-complaint" data-complaint-id="${item.id}">🔍 İncele</button></td>
+            <td style="text-align: right;">
+                <button type="button" class="btn btn-icon btn-sm" onclick="openReviewDetailModal('${item.id}')" aria-label="İncele" title="İncele">
+                    <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                </button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
+    
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
 }
 
 function filterReviewQueue() {
@@ -864,7 +1255,7 @@ async function openReviewDetailModal(id) {
         if (res.ok) {
             currentActiveItem = await res.json();
             
-            document.getElementById("md-title").innerText = `✏️ İnceleme ve Düzeltme Modalı: ${currentActiveItem.id}`;
+            document.getElementById("md-title").innerText = `İnceleme ve Düzeltme Modalı: ${currentActiveItem.id}`;
             document.getElementById("md-masked-text").innerText = currentActiveItem.maskedText || currentActiveItem.masked_content;
             
             document.getElementById("edit-primary-product").value = currentActiveItem.primaryProduct || "Fiber";
@@ -879,7 +1270,7 @@ async function openReviewDetailModal(id) {
             document.getElementById("modal-review-detail").classList.remove("hidden");
         }
     } catch (e) {
-        alert("Kayıt detayları yüklenemedi.");
+        showEnterpriseModal("Hata", "Kayıt detayları yüklenemedi.");
     }
 }
 
@@ -892,7 +1283,7 @@ async function submitApproveAiReview() {
     try {
         const res = await fetch(`${API_BASE}/api/v1/complaints/${currentActiveItem.id}/approve`, { method: "POST" });
         if (res.ok) {
-            showEnterpriseModal("Başarılı", `<p>✅ ${currentActiveItem.id} AI sonucu başarıyla onaylandı.</p>`);
+            showEnterpriseModal("Başarılı", `<p>${currentActiveItem.id} AI sonucu başarıyla onaylandı.</p>`);
             closeReviewDetailModal();
 
             // Instantly remove from DOM
@@ -929,7 +1320,7 @@ async function submitEditReview() {
             body: JSON.stringify(payload)
         });
         if (res.ok) {
-            showEnterpriseModal("Başarılı", `<p>✏️ ${currentActiveItem.id} kaydı başarıyla düzenlendi ve onaylandı.</p>`);
+            showEnterpriseModal("Başarılı", `<p>${currentActiveItem.id} kaydı başarıyla düzenlendi ve onaylandı.</p>`);
             closeReviewDetailModal();
             
             // Instantly remove from DOM
@@ -1051,7 +1442,7 @@ function setPreset(type) {
 async function analyzeText() {
     const input = document.getElementById("review-input").value.trim();
     if (!input) {
-        alert("Lütfen önce analiz edilecek bir müşteri yorumu girin.");
+        showEnterpriseModal("Uyarı", "Lütfen önce analiz edilecek bir müşteri yorumu girin.");
         return;
     }
 
@@ -1097,7 +1488,7 @@ function renderAnalysisResult(data) {
         const multiBadge = document.createElement("div");
         multiBadge.className = "product-badge-large";
         multiBadge.style.background = "linear-gradient(135deg, #EC4899, #BE185D)";
-        multiBadge.innerText = "🔥 Çoklu Ürün Tespit Edildi";
+        multiBadge.innerText = "Çoklu Ürün Tespit Edildi";
         prodsContainer.appendChild(multiBadge);
     }
 
@@ -1105,9 +1496,9 @@ function renderAnalysisResult(data) {
     
     const reviewBadge = document.getElementById("res-review-badge");
     if (data.needsHumanReview) {
-        reviewBadge.innerHTML = `<span class="badge-sent negative">⚠️ Manuel İnceleme Öneriliyor</span>`;
+        reviewBadge.innerHTML = `<span class="badge-sent negative">Manuel İnceleme Öneriliyor</span>`;
     } else {
-        reviewBadge.innerHTML = `<span class="badge-sent positive">✅ Otomatik Onaylandı</span>`;
+        reviewBadge.innerHTML = `<span class="badge-sent positive">Otomatik Onaylandı</span>`;
     }
 
     document.getElementById("res-main-cat").innerText = data.mainCategory || "Diğer";
@@ -1313,7 +1704,7 @@ async function loadExecutiveDashboardData() {
         const sparsityBanner = document.getElementById("exec-sparsity-banner");
         const trendBadge = document.getElementById("exec-trend-badge");
         if (meta.is_sparse && meta.warning_message) {
-            if (sparsityBanner) sparsityBanner.innerText = `⚠️ ${meta.warning_message}`;
+            if (sparsityBanner) sparsityBanner.innerText = `${meta.warning_message}`;
         } else {
             if (sparsityBanner) sparsityBanner.innerText = "";
         }
@@ -1604,11 +1995,11 @@ async function openComplaintDetailModal(id) {
             const modal = document.getElementById("modal-complaint-detail");
             modal.classList.remove("hidden");
         } else {
-            alert(`Şikâyet detayı yüklenemedi. HTTP ${res.status}`);
+            showEnterpriseModal("Hata", `Şikâyet detayı yüklenemedi. HTTP ${res.status}`);
         }
     } catch (e) {
         console.error("openComplaintDetailModal error:", e);
-        alert("Şikâyet detayı getirilirken bir hata oluştu.");
+        showEnterpriseModal("Hata", "Şikâyet detayı getirilirken bir hata oluştu.");
     }
 }
 
@@ -1649,42 +2040,71 @@ function populateReviewedTable(data) {
     tbody.innerHTML = "";
 
     if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;">İncelenen kayıt bulunamadı.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding: 24px; color: var(--text-muted);">İncelenen kayıt bulunamadı.</td></tr>`;
         return;
     }
 
+    const URGENCY_MAP = {
+        "Low": { text: "Düşük", color: "var(--turkcell-green)", bg: "rgba(16, 185, 129, 0.1)" },
+        "Medium": { text: "Orta", color: "var(--turkcell-yellow)", bg: "rgba(245, 158, 11, 0.1)" },
+        "High": { text: "Yüksek", color: "var(--turkcell-orange)", bg: "rgba(249, 115, 22, 0.1)" },
+        "Critical": { text: "Kritik", color: "var(--turkcell-red)", bg: "rgba(239, 68, 68, 0.1)" }
+    };
+
+    const STATUS_MAP = {
+        'APPROVED': { text: 'Onaylandı', color: 'var(--turkcell-green)', bg: 'rgba(16, 185, 129, 0.15)' },
+        'CORRECTED': { text: 'Düzeltilerek Onaylandı', color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.15)' },
+        'REANALYZED': { text: 'Yeniden Analiz', color: 'var(--turkcell-blue)', bg: 'rgba(59, 130, 246, 0.15)' },
+        'REJECTED': { text: 'Reddedildi', color: 'var(--turkcell-red)', bg: 'rgba(239, 68, 68, 0.15)' },
+        'DEFERRED': { text: 'Ertelendi', color: 'var(--turkcell-orange)', bg: 'rgba(249, 115, 22, 0.15)' }
+    };
+
     data.forEach(item => {
         const tr = document.createElement("tr");
-        const statusColors = {
-            'APPROVED': '#10B981',
-            'CORRECTED': '#F59E0B',
-            'REANALYZED': '#3B82F6',
-            'REJECTED': '#EF4444'
-        };
-        const color = statusColors[item.reviewStatus] || '#6B7280';
         
-        const aiProd = item.products ? item.products.join(", ") : item.primaryProduct;
         const finalProd = item.finalProduct || item.primaryProduct;
-        const isChanged = (item.reviewStatus === 'CORRECTED') ? '<span style="color:var(--turkcell-yellow);">Evet</span>' : '<span style="color:var(--turkcell-green);">Hayır</span>';
-        const notePreview = item.reviewNote ? (item.reviewNote.length > 30 ? item.reviewNote.substring(0, 30) + "..." : item.reviewNote) : "-";
+        const stObj = STATUS_MAP[item.reviewStatus] || { text: item.reviewStatus, color: '#94A3B8', bg: 'rgba(148, 163, 184, 0.15)' };
         
+        const isChanged = (item.reviewStatus === 'CORRECTED') ? '<span class="status-badge" style="background: rgba(139, 92, 246, 0.15); color: #8B5CF6;">Değiştirildi</span>' : '<span class="status-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--turkcell-green);">Değişmedi</span>';
+        
+        const notePreview = item.reviewNote ? (item.reviewNote.length > 30 ? item.reviewNote.substring(0, 30) + "..." : item.reviewNote) : "-";
+        const urgObj = URGENCY_MAP[item.urgency] || URGENCY_MAP["Medium"];
+        
+        const sentTR = LABEL_MAP_SENTIMENT[item.sentiment] || item.sentiment;
+        const sentColor = SENTIMENT_COLORS[item.sentiment] || "var(--text-muted)";
+
         tr.innerHTML = `
-            <td><strong style="color: var(--turkcell-blue); cursor: pointer;" onclick="openReviewedDetailModal('${item.id}')">${item.id}</strong></td>
-            <td><strong>${finalProd}</strong></td>
-            <td><div style="font-weight:600;">${item.mainCategory}</div><div style="font-size:0.75rem;">${item.subCategory}</div></td>
-            <td>${item.sentiment}</td>
-            <td><span class="badge-sent ${item.urgency==='High'||item.urgency==='Critical'?'negative':'positive'}">${item.urgency}</span></td>
-            <td><span style="color:${color}; font-weight:bold;">${item.reviewStatus}</span></td>
-            <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.reviewNote || ''}">${notePreview}</td>
-            <td><div style="font-size:0.8rem;">${item.reviewedAt || '-'}</div></td>
-            <td>${item.reviewedBy || '-'}</td>
-            <td><strong>${isChanged}</strong></td>
             <td>
-                <button class="btn-icon" title="Detay" onclick="openReviewedDetailModal('${item.id}')">🔍</button>
+                <a href="#" class="corporate-link" onclick="openReviewedDetailModal('${item.id}'); return false;"><strong>${item.id}</strong></a>
+            </td>
+            <td><strong>${finalProd}</strong></td>
+            <td><div style="font-weight:600;">${item.mainCategory}</div><div style="font-size:0.75rem; color: var(--text-muted);">${item.subCategory}</div></td>
+            <td>
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="width:8px; height:8px; border-radius:50%; background:${sentColor}; display:inline-block;"></span>
+                    <span style="font-size:0.8rem;">${sentTR}</span>
+                </div>
+            </td>
+            <td><span class="status-badge" style="background: ${urgObj.bg}; color: ${urgObj.color};">${urgObj.text}</span></td>
+            <td><span class="status-badge" style="background: ${stObj.bg}; color: ${stObj.color};">${stObj.text}</span></td>
+            <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(item.reviewNote || '').replace(/"/g, '&quot;')}">
+                <a href="#" class="corporate-link" style="color: var(--text-color);" onclick="openReviewedDetailModal('${item.id}'); return false;">${notePreview}</a>
+            </td>
+            <td><div style="font-size:0.8rem;">${item.reviewedAt || '-'}</div></td>
+            <td><span style="font-size: 0.85rem; color: var(--text-muted);">${item.reviewedBy || '-'}</span></td>
+            <td>${isChanged}</td>
+            <td style="text-align: right;">
+                <button type="button" class="btn btn-icon btn-sm" aria-label="Detay" title="Detay Görüntüle" onclick="openReviewedDetailModal('${item.id}')">
+                    <i data-lucide="eye" style="width: 16px; height: 16px;"></i>
+                </button>
             </td>
         `;
         tbody.appendChild(tr);
     });
+
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
 }
 
 async function openReviewHistoryModal(id) {
@@ -2063,4 +2483,60 @@ async function openReviewedDetailModal(id) {
 
 function closeReviewedDetailModal() {
     document.getElementById("modal-reviewed-detail").classList.add("hidden");
+}
+
+
+// UI-7 Custom Date Toggles
+function handleDateFilterChange(selectId, customDivId) {
+    const el = document.getElementById(selectId);
+    const div = document.getElementById(customDivId);
+    if (!el || !div) return;
+    el.addEventListener('change', (e) => {
+        if (e.target.value === 'CUSTOM') {
+            div.classList.remove('hidden');
+        } else {
+            div.classList.add('hidden');
+            // Trigger load automatically for other selections
+            if (selectId === 'exec-date-filter') loadExecutiveDashboard();
+            if (selectId === 'pd-filter-date') loadProductAnalytics();
+            if (selectId === 'rc-filter-date') filterReviewedTable();
+            if (selectId === 'f-date') filterComplaintsTable();
+        }
+    });
+}
+document.addEventListener('DOMContentLoaded', () => {
+    handleDateFilterChange('exec-date-filter', 'exec-custom-date');
+    handleDateFilterChange('pd-filter-date', 'pd-custom-date');
+    handleDateFilterChange('rc-filter-date', 'rc-custom-date');
+    handleDateFilterChange('f-date', 'db-custom-date');
+});
+
+// UI-7 Abort Controllers to prevent race conditions
+const abortControllers = {};
+function getAbortSignal(key) {
+    if (abortControllers[key]) {
+        abortControllers[key].abort();
+    }
+    abortControllers[key] = new AbortController();
+    return abortControllers[key].signal;
+}
+
+// Helper to append date params
+function appendDateParams(url, prefix) {
+    const sel = document.getElementById(prefix + '-date-filter') || document.getElementById('f-date');
+    if (!sel) return url;
+    
+    let val = sel.value;
+    let urlObj = new URL(url, window.location.origin);
+    
+    if (val === 'CUSTOM') {
+        const df = document.getElementById(prefix + '-date-from') || document.getElementById('db-date-from');
+        const dt = document.getElementById(prefix + '-date-to') || document.getElementById('db-date-to');
+        if (df && df.value) urlObj.searchParams.append('date_from', df.value);
+        if (dt && dt.value) urlObj.searchParams.append('date_to', dt.value);
+        urlObj.searchParams.append('period', 'CUSTOM');
+    } else {
+        urlObj.searchParams.append('period', val);
+    }
+    return urlObj.toString().replace(window.location.origin, '');
 }
