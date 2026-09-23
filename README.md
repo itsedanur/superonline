@@ -40,8 +40,6 @@ Toplam şikayet hacmi, ürün bazlı dağılım (Fiber, Superbox, ADSL), konu ka
 ### 💡 4. Detaylı Şikayet & AI İçgörü Modalı
 Şikayet metni, AI tarafından önerilen aksiyonlar, duygu puanı, kök neden analizi ve doğrudan yanıt şablonu önerileri.
 
-![Complaint Detail Modal](assets/images/complaint_detail_modal.png)
-
 ---
 
 ## 🔥 Temel Özellikler
