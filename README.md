@@ -37,14 +37,7 @@ Toplam şikayet hacmi, ürün bazlı dağılım (Fiber, Superbox, ADSL), konu ka
 
 ---
 
-### 📝 4. Manuel İnceleme Kuyruğu (Review Queue)
-AI tespit güven puanı düşük (`confidence < 0.70`) veya ürün çelişkisi bulunan kayıtların operatörler tarafından incelenmesi ve düzeltilmesi.
-
-![Review Queue](assets/images/review_queue_table.png)
-
----
-
-### 💡 5. Detaylı Şikayet & AI İçgörü Modalı
+### 💡 4. Detaylı Şikayet & AI İçgörü Modalı
 Şikayet metni, AI tarafından önerilen aksiyonlar, duygu puanı, kök neden analizi ve doğrudan yanıt şablonu önerileri.
 
 ![Complaint Detail Modal](assets/images/complaint_detail_modal.png)
